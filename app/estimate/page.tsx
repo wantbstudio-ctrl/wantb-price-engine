@@ -1257,6 +1257,24 @@ export default function EstimatePage() {
                 >
                   PDF
                 </button>
+
+                <button
+                  onClick={() => {
+                    const subject = encodeURIComponent(`[견적서] ${estimateTitle || "견적서"}`);
+                    const body = encodeURIComponent(
+                      "안녕하세요.\n\n견적서를 전달드립니다.\n\n" +
+                        `견적번호: ${estimateNumber}\n` +
+                        `제품: ${estimateTitle}\n` +
+                        `총금액: ${formatNumber(totalAmount)}원\n\n` +
+                        "감사합니다."
+                    );
+
+                    window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+                  }}
+                  className="rounded-xl border border-blue-200 bg-white px-4 py-3 text-sm font-medium text-blue-700 hover:bg-blue-50"
+                >
+                  메일 발송
+                </button>
               </div>
 
               <button
