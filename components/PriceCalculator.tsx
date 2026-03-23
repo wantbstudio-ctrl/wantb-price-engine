@@ -76,14 +76,16 @@ export default function PriceCalculator() {
 
       const parsed = JSON.parse(raw);
 
-      setProductName(parsed?.productName || "");
-      setManufacturingCost(Number(parsed?.manufacturingCost ?? 0));
-      setPackageCost(Number(parsed?.packageCost ?? 0));
-      setShippingCost(Number(parsed?.shippingCost ?? 0));
-      setAdCost(Number(parsed?.adCost ?? 0));
-      setStorageCost(Number(parsed?.storageCost ?? 0));
-      setReturnCost(Number(parsed?.returnCost ?? 0));
-      setDefectRate(Number(parsed?.defectRate ?? 0));
+      // 기존 개별 비용 대신 totalCost 기준으로 세팅
+const total = Number(parsed?.totalCost ?? 0);
+
+setManufacturingCost(total);
+setPackageCost(0);
+setShippingCost(0);
+setAdCost(0);
+setStorageCost(0);
+setReturnCost(0);
+setDefectRate(0);
 
       setPlatformFee(Number(parsed?.platformFee ?? 0));
       setMarginRate(Number(parsed?.marginRate ?? 0));
