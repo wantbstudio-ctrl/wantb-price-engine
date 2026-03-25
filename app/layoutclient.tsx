@@ -9,12 +9,17 @@ type LayoutClientProps = {
 };
 
 const menuItems = [
-  { labelKr: "대시보드", labelEn: "Dashboard", href: "/" },
-  { labelKr: "제품관리", labelEn: "Products", href: "/products" },
-  { labelKr: "견적서", labelEn: "Estimate", href: "/estimate" },
-  { labelKr: "회사정보", labelEn: "Company Settings", href: "/company-settings" },
-  { labelKr: "템플릿", labelEn: "Templates", href: "/templates" },
-  { labelKr: "소개", labelEn: "About", href: "/about" },
+  { label: "Dashboard", sub: "대시보드", href: "/" },
+  { label: "Products", sub: "제품관리", href: "/products" },
+  { label: "Estimate", sub: "견적서", href: "/estimate" },
+
+  // ✅ 추가됨 (핵심)
+  { label: "Statement", sub: "거래명세표", href: "/statement" },
+
+  { label: "Clients", sub: "거래처관리", href: "/clients" },
+  { label: "Company Settings", sub: "회사설정", href: "/company-settings" },
+  { label: "Templates", sub: "템플릿", href: "/templates" },
+  { label: "About", sub: "프로그램정보", href: "/about" },
 ];
 
 export default function LayoutClient({ children }: LayoutClientProps) {
@@ -23,66 +28,42 @@ export default function LayoutClient({ children }: LayoutClientProps) {
   return (
     <div className="flex min-h-screen bg-gray-100">
       {/* 사이드바 */}
-      <aside className="no-drag w-[360px] border-r border-gray-200 bg-white px-7 py-8">
+      <aside className="no-drag w-[260px] border-r border-gray-200 bg-white px-5 py-6">
         <div className="mb-10">
-          <h1 className="text-[24px] font-extrabold leading-tight text-gray-900">
-            WantB Price
-            <br />
-            Engine
-          </h1>
-          <p className="mt-3 text-sm leading-6 text-gray-500">
-            판매가 계산 · 견적 생성 프로그램
-            <br />
-            Price Calculator & Estimate Tool
-          </p>
+          <h1 className="text-xl font-bold text-gray-900">원프앤</h1>
+          <p className="mt-1 text-xs text-gray-400">WantB Price Engine</p>
         </div>
 
-        <nav className="space-y-3">
+        <nav className="flex flex-col gap-2">
           {menuItems.map((item) => {
-            const isActive =
-              item.href === "/"
-                ? pathname === "/"
-                : pathname?.startsWith(item.href);
+            const isActive = pathname === item.href;
 
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`block rounded-2xl px-5 py-4 transition ${
+                className={`flex flex-col rounded-xl px-4 py-3 transition ${
                   isActive
-                    ? "bg-slate-900 text-white"
+                    ? "bg-gray-900 text-white"
                     : "text-gray-700 hover:bg-gray-100"
                 }`}
               >
-                <div className="text-[15px] font-semibold leading-none">
-                  {item.labelKr}
-                </div>
-                <div
-                  className={`mt-2 text-xs ${
-                    isActive ? "text-gray-200" : "text-gray-400"
+                <span className="text-sm font-semibold">{item.label}</span>
+                <span
+                  className={`text-xs ${
+                    isActive ? "text-gray-300" : "text-gray-400"
                   }`}
                 >
-                  {item.labelEn}
-                </div>
+                  {item.sub}
+                </span>
               </Link>
             );
           })}
         </nav>
-
-        <div className="mt-10">
-          <a
-            href="https://hometax.go.kr"
-            target="_blank"
-            rel="noreferrer"
-            className="block rounded-2xl bg-blue-600 px-5 py-4 text-sm font-semibold text-white transition hover:bg-blue-700"
-          >
-            HomeTax / 홈택스 바로가기
-          </a>
-        </div>
       </aside>
 
-      {/* 본문 */}
-      <main className="flex-1 p-5">{children}</main>
+      {/* 메인 영역 */}
+      <main className="flex-1 p-6">{children}</main>
     </div>
   );
 }

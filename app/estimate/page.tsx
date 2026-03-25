@@ -66,6 +66,7 @@ const STORAGE_KEY = "wantb-estimates";
 const PRODUCT_KEY = "wantb-products";
 const COMPANY_KEY = "wantb-company-settings";
 const ESTIMATE_DRAFT_KEY = "estimate-draft";
+const SELECTED_CLIENT_KEY = "wantb-selected-client";
 
 const ESTIMATE_SEQ_KEY = "wantb-estimate-seq";
 const CURRENT_ESTIMATE_NUMBER_KEY = "wantb-current-estimate-number";
@@ -405,6 +406,24 @@ export default function EstimatePage() {
           setEstimateNumber(String(nextNumber));
         }
       }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    try {
+      const raw = localStorage.getItem(SELECTED_CLIENT_KEY);
+      if (!raw) return;
+
+      const client = JSON.parse(raw);
+
+      setClientName(client?.name || "");
+      setManagerName(client?.owner || "");
+      setPhone(client?.phone || "");
+      setEmail(client?.email || "");
     } catch {
       // ignore
     }
@@ -1013,6 +1032,77 @@ export default function EstimatePage() {
     }
   };
 
+  const handlePrint = async () => {
+    try {
+      const canvas = await htmlToCanvas();
+      const imgData = canvas.toDataURL("image/png");
+
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      document.body.appendChild(iframe);
+
+      const iframeDoc = iframe.contentWindow?.document;
+      if (!iframeDoc) {
+        document.body.removeChild(iframe);
+        alert("인쇄 프레임을 생성할 수 없습니다.");
+        return;
+      }
+
+      iframeDoc.open();
+      iframeDoc.write(`
+        <html>
+          <head>
+            <title>Print</title>
+            <style>
+              html, body {
+                margin: 0;
+                padding: 0;
+                background: #ffffff;
+              }
+              body {
+                display: flex;
+                justify-content: center;
+                align-items: flex-start;
+              }
+              img {
+                width: 794px;
+                max-width: 100%;
+                height: auto;
+                display: block;
+              }
+              @page {
+                size: A4;
+                margin: 6mm;
+              }
+            </style>
+          </head>
+          <body>
+            <img src="${imgData}" />
+          </body>
+        </html>
+      `);
+      iframeDoc.close();
+
+      setTimeout(() => {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 1000);
+      }, 300);
+    } catch {
+      alert("인쇄 중 오류가 발생했습니다.");
+    }
+  };
+
   let vatSummaryText = "";
 
   if (vatMode === "included") {
@@ -1256,6 +1346,13 @@ export default function EstimatePage() {
                   className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
                   PDF
+                </button>
+
+                <button
+                  onClick={handlePrint}
+                  className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  인쇄
                 </button>
 
                 <button
