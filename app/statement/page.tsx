@@ -973,7 +973,7 @@ export default function StatementPage() {
 
   return (
     <div className="min-h-screen bg-[#f4f6fa] p-6">
-      <div className="mx-auto grid max-w-[1720px] grid-cols-1 gap-6 xl:grid-cols-[560px_1fr]">
+      <div className="mx-auto grid max-w-[1820px] grid-cols-1 gap-4 xl:grid-cols-[680px_1fr]">
         <div className="space-y-6">
           <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
             <h1 className="text-2xl font-bold text-gray-900">거래명세표</h1>
@@ -1210,7 +1210,7 @@ export default function StatementPage() {
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 md:grid-cols-10">
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-[52px_52px_52px_1.4fr_0.9fr_0.7fr_0.8fr_1fr_1fr_1fr]">
                     <input
                       placeholder="년"
                       value={item.dateYear}
