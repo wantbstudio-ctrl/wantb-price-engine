@@ -420,8 +420,8 @@ export default function EstimatePage() {
 
       const client = JSON.parse(raw);
 
-      setClientName(client?.name || "");
-      setManagerName(client?.owner || "");
+      setClientName(client?.companyName || client?.name || "");
+      setManagerName(client?.managerName || client?.owner || "");
       setPhone(client?.phone || "");
       setEmail(client?.email || "");
     } catch {
@@ -1114,32 +1114,38 @@ export default function EstimatePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="grid w-full gap-5 xl:grid-cols-[1.10fr_0.95fr]">
-        <div className="space-y-6">
-          <div className="rounded-2xl bg-white p-6 shadow-sm">
-            <h1 className="mb-1 text-2xl font-bold text-gray-900">Estimate</h1>
-            <p className="mb-6 text-sm text-gray-500">견적 생성 및 저장 / 출력</p>
+    <div className="min-h-screen bg-[#f3f5f8] px-4 py-4 xl:px-5 xl:py-5">
+      <div className="mx-auto grid max-w-[1920px] grid-cols-1 gap-5 xl:grid-cols-[780px_minmax(0,1fr)]">
+        <div className="space-y-4">
+          <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-4 shadow-sm">
+            <h1 className="text-[19px] font-bold text-gray-900">견적서</h1>
+            <p className="mt-1 text-[12px] text-gray-500">
+              견적 생성 및 저장 / 출력
+            </p>
+          </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">견적번호</label>
+          <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-5 shadow-sm">
+            <h2 className="mb-3 text-[16px] font-semibold text-gray-900">기본 정보</h2>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">견적번호</span>
                 <input
                   value={estimateNumber}
                   onChange={(e) => setEstimateNumber(e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
+                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
                   placeholder="WB-2026-0001"
                 />
-              </div>
+              </label>
 
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
+              <label className="block">
+                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">
                   저장된 제품 불러오기
-                </label>
+                </span>
                 <select
                   value={items[0]?.productName || ""}
                   onChange={(e) => handleProductSelect(e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
+                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
                 >
                   <option value="">제품 선택</option>
                   {savedProducts.map((item) => (
@@ -1148,276 +1154,292 @@ export default function EstimatePage() {
                     </option>
                   ))}
                 </select>
-              </div>
+              </label>
+            </div>
+          </div>
+
+          <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-5 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-[16px] font-semibold text-gray-900">품목 정보</h2>
+              <button
+                type="button"
+                onClick={handleAddItem}
+                className="rounded-2xl bg-gray-900 px-4 py-2 text-[13px] font-medium text-white"
+              >
+                품목 추가
+              </button>
             </div>
 
-            <div className="mt-6 space-y-4">
+            <div className="space-y-3">
               {items.map((item, index) => (
-                <div
-                  key={index}
-                  className="grid gap-3 rounded-2xl border border-gray-200 p-3 md:grid-cols-[2fr_1fr_1fr_auto]"
-                >
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      제품명 {items.length > 1 ? index + 1 : ""}
-                    </label>
-                    <input
-                      value={item.productName}
-                      onChange={(e) => handleItemChange(index, "productName", e.target.value)}
-                      className="w-full rounded-xl border border-gray-300 px-4 py-2.5 outline-none focus:border-gray-900"
-                      placeholder="제품명을 입력하세요"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">수량</label>
-                    <input
-                      type="number"
-                      value={item.quantity}
-                      onChange={(e) =>
-                        handleItemChange(index, "quantity", Number(e.target.value || 0))
-                      }
-                      className="w-full rounded-xl border border-gray-300 px-4 py-2.5 outline-none focus:border-gray-900"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">단가</label>
-                    <input
-                      type="number"
-                      value={item.unitPrice}
-                      onChange={(e) =>
-                        handleItemChange(index, "unitPrice", Number(e.target.value || 0))
-                      }
-                      className="w-full rounded-xl border border-gray-300 px-4 py-2.5 outline-none focus:border-gray-900"
-                    />
-                  </div>
-
-                  <div className="flex items-end">
+                <div key={index} className="rounded-[22px] border border-gray-200 bg-[#fbfbfc] p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <p className="text-[13px] font-semibold text-gray-800">
+                      품목 {index + 1}
+                    </p>
                     {items.length > 1 ? (
                       <button
                         type="button"
                         onClick={() => handleRemoveItem(index)}
-                        className="rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
+                        className="text-[13px] font-medium text-red-500"
                       >
                         삭제
                       </button>
                     ) : null}
                   </div>
+
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-[2fr_1fr_1fr]">
+                    <label className="block">
+                      <span className="mb-1.5 block text-[11px] font-semibold text-gray-600">제품명</span>
+                      <input
+                        value={item.productName}
+                        onChange={(e) => handleItemChange(index, "productName", e.target.value)}
+                        className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
+                        placeholder="제품명을 입력하세요"
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-1.5 block text-[11px] font-semibold text-gray-600">수량</span>
+                      <input
+                        type="number"
+                        value={item.quantity}
+                        onChange={(e) =>
+                          handleItemChange(index, "quantity", Number(e.target.value || 0))
+                        }
+                        className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-1.5 block text-[11px] font-semibold text-gray-600">단가</span>
+                      <input
+                        type="number"
+                        value={item.unitPrice}
+                        onChange={(e) =>
+                          handleItemChange(index, "unitPrice", Number(e.target.value || 0))
+                        }
+                        className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
+                      />
+                    </label>
+                  </div>
                 </div>
               ))}
+            </div>
 
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleAddItem}
-                  className="rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
-                >
-                  + 제품 추가
-                </button>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">부가세 방식</label>
+            <div className="mt-3">
+              <label className="block">
+                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">부가세 방식</span>
                 <select
                   value={vatMode}
                   onChange={(e) => setVatMode(e.target.value as VatMode)}
-                  className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
+                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
                 >
                   <option value="included">부가세 포함</option>
                   <option value="separate">부가세 별도</option>
                   <option value="none">부가세 없음</option>
                 </select>
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <h2 className="mb-4 text-lg font-semibold text-gray-900">거래처 정보</h2>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">상호</label>
-                  <input
-                    value={clientName}
-                    onChange={(e) => setClientName(e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
-                    placeholder="거래처명"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">담당자명</label>
-                  <input
-                    value={managerName}
-                    onChange={(e) => setManagerName(e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
-                    placeholder="담당자명"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">연락처</label>
-                  <input
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
-                    placeholder="연락처"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">이메일</label>
-                  <input
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
-                    placeholder="이메일"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">납품조건</label>
-                  <input
-                    value={deliveryCondition}
-                    onChange={(e) => setDeliveryCondition(e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
-                    placeholder="예: 선입금 후 제작"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">유효기간</label>
-                  <input
-                    value={validUntil}
-                    onChange={(e) => setValidUntil(e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
-                    placeholder="예: 발행일 기준 7일 / 2026-03-31"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 rounded-2xl bg-gray-50 p-4">
-              <h2 className="mb-4 text-lg font-semibold text-gray-900">자동 계산 결과</h2>
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="rounded-xl bg-white p-4 shadow-sm">
-                  <div className="text-sm text-gray-500">공급가</div>
-                  <div className="mt-2 text-xl font-bold text-gray-900">
-                    {formatNumber(supplyPrice)}원
-                  </div>
-                </div>
-                <div className="rounded-xl bg-white p-4 shadow-sm">
-                  <div className="text-sm text-gray-500">VAT</div>
-                  <div className="mt-2 text-xl font-bold text-gray-900">{formatNumber(vat)}원</div>
-                </div>
-                <div className="rounded-xl bg-white p-4 shadow-sm">
-                  <div className="text-sm text-gray-500">총금액</div>
-                  <div className="mt-2 text-xl font-bold text-gray-900">
-                    {formatNumber(totalAmount)}원
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={handleResetEstimate}
-                  className="rounded-xl border border-red-200 px-4 py-3 text-sm font-semibold text-red-600 hover:bg-red-50"
-                >
-                  초기화
-                </button>
-
-                <button
-                  onClick={handleDownloadPng}
-                  className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  PNG
-                </button>
-
-                <button
-                  onClick={handleDownloadJpg}
-                  className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  JPG
-                </button>
-
-                <button
-                  onClick={handleDownloadPdf}
-                  className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  PDF
-                </button>
-
-                <button
-                  onClick={handlePrint}
-                  className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  인쇄
-                </button>
-
-                <button
-                  onClick={() => {
-                    const subject = encodeURIComponent(`[견적서] ${estimateTitle || "견적서"}`);
-                    const body = encodeURIComponent(
-                      "안녕하세요.\n\n견적서를 전달드립니다.\n\n" +
-                        `견적번호: ${estimateNumber}\n` +
-                        `제품: ${estimateTitle}\n` +
-                        `총금액: ${formatNumber(totalAmount)}원\n\n` +
-                        "감사합니다."
-                    );
-
-                    window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
-                  }}
-                  className="rounded-xl border border-blue-200 bg-white px-4 py-3 text-sm font-medium text-blue-700 hover:bg-blue-50"
-                >
-                  메일 발송
-                </button>
-              </div>
-
-              <button
-                onClick={handleSaveEstimate}
-                className="rounded-xl bg-gray-900 px-6 py-3 text-sm font-semibold text-white hover:bg-black"
-              >
-                견적 저장
-              </button>
+              </label>
             </div>
           </div>
 
-          <div className="rounded-2xl bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">저장된 견적 목록</h2>
+          <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-5 shadow-sm">
+            <h2 className="mb-3 text-[16px] font-semibold text-gray-900">거래처 정보</h2>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">상호</span>
+                <input
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
+                  placeholder="거래처명"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">담당자명</span>
+                <input
+                  value={managerName}
+                  onChange={(e) => setManagerName(e.target.value)}
+                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
+                  placeholder="담당자명"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">연락처</span>
+                <input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
+                  placeholder="연락처"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">이메일</span>
+                <input
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
+                  placeholder="이메일"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">납품조건</span>
+                <input
+                  value={deliveryCondition}
+                  onChange={(e) => setDeliveryCondition(e.target.value)}
+                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
+                  placeholder="예: 선입금 후 제작"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">유효기간</span>
+                <input
+                  value={validUntil}
+                  onChange={(e) => setValidUntil(e.target.value)}
+                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
+                  placeholder="예: 발행일 기준 7일 / 2026-03-31"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-5 shadow-sm">
+            <h2 className="mb-3 text-[16px] font-semibold text-gray-900">자동 계산 결과</h2>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-[22px] border border-gray-200 bg-gray-50 p-4">
+                <div className="text-[12px] text-gray-500">공급가</div>
+                <div className="mt-2 text-[24px] font-bold text-gray-900">
+                  {formatNumber(supplyPrice)}원
+                </div>
+              </div>
+
+              <div className="rounded-[22px] border border-gray-200 bg-gray-50 p-4">
+                <div className="text-[12px] text-gray-500">VAT</div>
+                <div className="mt-2 text-[24px] font-bold text-gray-900">
+                  {formatNumber(vat)}원
+                </div>
+              </div>
+
+              <div className="rounded-[22px] border border-gray-200 bg-gray-50 p-4">
+                <div className="text-[12px] text-gray-500">총금액</div>
+                <div className="mt-2 text-[24px] font-bold text-gray-900">
+                  {formatNumber(totalAmount)}원
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-5 shadow-sm">
+            <h2 className="mb-3 text-[16px] font-semibold text-gray-900">저장 / 출력</h2>
+
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+              <button
+                onClick={handleResetEstimate}
+                className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2.5 text-[13px] font-semibold text-red-600"
+              >
+                초기화
+              </button>
+
+              <button
+                onClick={handleDownloadPng}
+                className="rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-semibold text-gray-900"
+              >
+                PNG 저장
+              </button>
+
+              <button
+                onClick={handleDownloadJpg}
+                className="rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-semibold text-gray-900"
+              >
+                JPG 저장
+              </button>
+
+              <button
+                onClick={handleDownloadPdf}
+                className="rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-semibold text-gray-900"
+              >
+                PDF 저장
+              </button>
+
+              <button
+                onClick={handlePrint}
+                className="rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-semibold text-gray-900"
+              >
+                인쇄
+              </button>
+
+              <button
+                onClick={() => {
+                  const subject = encodeURIComponent(`[견적서] ${estimateTitle || "견적서"}`);
+                  const body = encodeURIComponent(
+                    "안녕하세요.\n\n견적서를 전달드립니다.\n\n" +
+                      `견적번호: ${estimateNumber}\n` +
+                      `제품: ${estimateTitle}\n` +
+                      `총금액: ${formatNumber(totalAmount)}원\n\n` +
+                      "감사합니다."
+                  );
+
+                  window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+                }}
+                className="rounded-2xl border border-blue-200 bg-white px-4 py-2.5 text-[13px] font-semibold text-blue-700"
+              >
+                메일 발송
+              </button>
+            </div>
+
+            <button
+              onClick={handleSaveEstimate}
+              className="mt-3 w-full rounded-2xl bg-gray-900 px-4 py-2.5 text-[13px] font-semibold text-white"
+            >
+              견적 저장
+            </button>
+          </div>
+
+          <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-5 shadow-sm">
+            <h2 className="mb-3 text-[16px] font-semibold text-gray-900">저장된 견적 목록</h2>
 
             {savedEstimates.length === 0 ? (
-              <p className="text-sm text-gray-500">저장된 견적이 없습니다.</p>
+              <div className="rounded-[22px] border border-dashed border-gray-300 p-6 text-[13px] text-gray-500">
+                저장된 견적이 없습니다.
+              </div>
             ) : (
               <div className="space-y-3">
                 {savedEstimates.map((item) => (
                   <div
                     key={item.id}
-                    className="flex flex-col gap-3 rounded-xl border border-gray-200 p-4 md:flex-row md:items-center md:justify-between"
+                    className="rounded-[22px] border border-gray-200 p-4"
                   >
-                    <div>
-                      <div className="text-sm font-semibold text-gray-900">
-                        {item.estimateNumber} / {item.productName}
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <div className="text-[14px] font-semibold text-gray-900">
+                          {item.estimateNumber} / {item.productName}
+                        </div>
+                        <div className="mt-1 text-[13px] text-gray-500">
+                          거래처: {item.clientName || "-"} / 총금액: {formatNumber(item.totalAmount)}원 / 저장일: {item.date}
+                        </div>
                       </div>
-                      <div className="mt-1 text-sm text-gray-500">
-                        거래처: {item.clientName || "-"} / 총금액: {formatNumber(item.totalAmount)}원 /
-                        저장일: {item.date}
-                      </div>
-                    </div>
 
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleLoadEstimate(item)}
-                        className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                      >
-                        불러오기
-                      </button>
-                      <button
-                        onClick={() => handleDeleteEstimate(item.id)}
-                        className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
-                      >
-                        삭제
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleLoadEstimate(item)}
+                          className="rounded-2xl bg-gray-900 px-4 py-2 text-[13px] font-medium text-white"
+                        >
+                          불러오기
+                        </button>
+                        <button
+                          onClick={() => handleDeleteEstimate(item.id)}
+                          className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-[13px] font-medium text-red-600"
+                        >
+                          삭제
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1426,188 +1448,197 @@ export default function EstimatePage() {
           </div>
         </div>
 
-        <div>
-          <div className="flex justify-center">
-            <div
-              id="estimate-print-area"
-              className="w-[794px] min-h-[1123px] rounded-2xl bg-white px-6 py-7 shadow-sm"
-            >
-              <div className="mb-4 flex items-end justify-between">
-                <div className="text-[28px] font-extrabold tracking-[-0.02em] text-gray-900">
-                  견적서 (ESTIMATE)
-                </div>
+        <div className="xl:sticky xl:top-5 xl:self-start">
+          <div className="rounded-[28px] border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between px-1">
+              <h2 className="text-[18px] font-semibold text-gray-900">A4 미리보기</h2>
+              <p className="text-[11px] text-gray-500">견적서 문서형 미리보기</p>
+            </div>
 
-                <div className="text-[20px] font-extrabold tracking-[-0.01em] text-gray-900">
-                  {displayCompanyName}
+            <div className="overflow-auto rounded-[22px] bg-[#edf1f6] p-3">
+              <div className="mx-auto flex justify-center">
+                <div
+                  id="estimate-print-area"
+                  className="w-[794px] min-h-[1123px] bg-white px-6 py-7 text-black"
+                >
+                  <div className="mb-4 flex items-end justify-between">
+                    <div className="text-[28px] font-extrabold tracking-[-0.02em] text-gray-900">
+                      견적서 (ESTIMATE)
+                    </div>
+
+                    <div className="text-[20px] font-extrabold tracking-[-0.01em] text-gray-900">
+                      {displayCompanyName}
+                    </div>
+                  </div>
+
+                  <div className="mb-3 h-[2px] w-full bg-gray-900"></div>
+
+                  <div className="mb-4 grid grid-cols-2 gap-5">
+                    <table className="w-full border-collapse">
+                      <tbody>
+                        <tr>
+                          <td className="w-[70px] py-1 text-[13px] font-bold text-gray-900">작성일</td>
+                          <td className="py-1 text-[13px] text-gray-900">{today}</td>
+                        </tr>
+                        <tr>
+                          <td className="py-1 text-[13px] font-bold text-gray-900">상호</td>
+                          <td className="py-1 text-[13px] text-gray-900">{clientName || "-"}</td>
+                        </tr>
+                        <tr>
+                          <td className="py-1 text-[13px] font-bold text-gray-900">제목</td>
+                          <td className="py-1 text-[13px] text-gray-900">{estimateTitle || "-"}</td>
+                        </tr>
+                        <tr>
+                          <td className="py-1 text-[13px] font-bold text-gray-900">합계</td>
+                          <td className="py-1 text-[13px] font-extrabold text-gray-900">
+                            {vatSummaryText}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+
+                    <table className="w-full border-collapse">
+                      <tbody>
+                        <tr>
+                          <td className="py-1 text-[13px] text-gray-900">{displayCompanyName}</td>
+                        </tr>
+                        <tr>
+                          <td className="py-1 text-[13px] text-gray-900">
+                            등록번호 {displayBusinessNumber}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="py-1 text-[13px] text-gray-900">{displayAddress}</td>
+                        </tr>
+                        <tr>
+                          <td className="py-1 text-[13px] text-gray-900">
+                            TEL : {displayCompanyPhone}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="py-1 text-[13px] text-gray-900">
+                            대표 : {displayCeoName}
+                            {companySettings.stampDataUrl ? (
+                              <img
+                                src={companySettings.stampDataUrl}
+                                alt="도장"
+                                className="ml-2 inline-block h-[54px] w-[54px] object-contain align-middle"
+                              />
+                            ) : (
+                              <span className="ml-2 inline-flex h-[54px] w-[54px] rotate-[-16deg] items-center justify-center rounded-full border-2 border-red-600 text-[12px] font-bold text-red-600">
+                                직인
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <table className="w-full table-fixed border-collapse border border-gray-900">
+                    <colgroup>
+                      <col style={{ width: "10%" }} />
+                      <col style={{ width: "22%" }} />
+                      <col style={{ width: "15%" }} />
+                      <col style={{ width: "7%" }} />
+                      <col style={{ width: "7%" }} />
+                      <col style={{ width: "14%" }} />
+                      <col style={{ width: "13%" }} />
+                      <col style={{ width: "12%" }} />
+                    </colgroup>
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="border border-gray-900 px-2 py-1.5 text-center text-[12px] font-bold">
+                          구분
+                        </th>
+                        <th className="border border-gray-900 px-2 py-1.5 text-center text-[12px] font-bold">
+                          품목
+                        </th>
+                        <th className="border border-gray-900 px-2 py-1.5 text-center text-[12px] font-bold">
+                          규격
+                        </th>
+                        <th className="border border-gray-900 px-2 py-1.5 text-center text-[12px] font-bold">
+                          단위
+                        </th>
+                        <th className="border border-gray-900 px-2 py-1.5 text-center text-[12px] font-bold">
+                          수량
+                        </th>
+                        <th className="border border-gray-900 px-2 py-1.5 text-center text-[12px] font-bold">
+                          단가
+                        </th>
+                        <th className="border border-gray-900 px-2 py-1.5 text-center text-[12px] font-bold">
+                          공급가액
+                        </th>
+                        <th className="border border-gray-900 px-2 py-1.5 text-center text-[12px] font-bold">
+                          비고
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {previewRows.map((row, index) => (
+                        <tr key={index}>
+                          <td className="h-[30px] border border-gray-900 px-2 py-1 text-center text-[12px]">
+                            {row.category || ""}
+                          </td>
+                          <td className="h-[30px] border border-gray-900 px-2 py-1 text-left text-[12px]">
+                            {row.item || ""}
+                          </td>
+                          <td className="h-[30px] border border-gray-900 px-2 py-1 text-center text-[12px]">
+                            {row.spec || ""}
+                          </td>
+                          <td className="h-[30px] border border-gray-900 px-2 py-1 text-center text-[12px]">
+                            {row.unit || ""}
+                          </td>
+                          <td className="h-[30px] border border-gray-900 px-2 py-1 text-center text-[12px]">
+                            {row.quantity || ""}
+                          </td>
+                          <td className="h-[30px] border border-gray-900 px-2 py-1 text-right text-[12px]">
+                            {row.price || ""}
+                          </td>
+                          <td className="h-[30px] border border-gray-900 px-2 py-1 text-right text-[12px]">
+                            {row.supplyAmount || ""}
+                          </td>
+                          <td className="h-[30px] border border-gray-900 px-2 py-1 text-left text-[12px]">
+                            {row.note || ""}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  <table className="mt-[1px] w-full border-collapse">
+                    <tbody>
+                      <tr>
+                        <td className="w-[70%] border border-gray-900 bg-gray-100 px-3 py-2 text-center text-[14px] font-extrabold text-gray-900">
+                          총 금 액
+                        </td>
+                        <td className="w-[30%] border border-gray-900 bg-gray-100 px-3 py-2 text-right text-[14px] font-extrabold text-gray-900">
+                          {formatNumber(totalAmount)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  <div className="mt-4 text-[13px] leading-6 text-gray-900">
+                    <div className="font-bold">고객 준수사항</div>
+                    <div>1. {getVatModeLabel(vatMode)}</div>
+                    <div>2. 납품조건 : {deliveryCondition || "-"}</div>
+                    <div>3. 유효기간 : {getDisplayDate(validUntil)}</div>
+                    <div>문의사항 : {displayCompanyPhone} / {displayCompanyEmail}</div>
+                    <div>계좌정보 : {displayAccountInfo}</div>
+                  </div>
+
+                  {companySettings.logoDataUrl ? (
+                    <div className="mt-5 flex justify-end">
+                      <img
+                        src={companySettings.logoDataUrl}
+                        alt="회사 로고"
+                        className="max-h-[48px] max-w-[150px] object-contain"
+                      />
+                    </div>
+                  ) : null}
                 </div>
               </div>
-
-              <div className="mb-3 h-[2px] w-full bg-gray-900"></div>
-
-              <div className="mb-4 grid grid-cols-2 gap-5">
-                <table className="w-full border-collapse">
-                  <tbody>
-                    <tr>
-                      <td className="w-[70px] py-1 text-[13px] font-bold text-gray-900">작성일</td>
-                      <td className="py-1 text-[13px] text-gray-900">{today}</td>
-                    </tr>
-                    <tr>
-                      <td className="py-1 text-[13px] font-bold text-gray-900">상호</td>
-                      <td className="py-1 text-[13px] text-gray-900">{clientName || "-"}</td>
-                    </tr>
-                    <tr>
-                      <td className="py-1 text-[13px] font-bold text-gray-900">제목</td>
-                      <td className="py-1 text-[13px] text-gray-900">{estimateTitle || "-"}</td>
-                    </tr>
-                    <tr>
-                      <td className="py-1 text-[13px] font-bold text-gray-900">합계</td>
-                      <td className="py-1 text-[13px] font-extrabold text-gray-900">
-                        {vatSummaryText}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-
-                <table className="w-full border-collapse">
-                  <tbody>
-                    <tr>
-                      <td className="py-1 text-[13px] text-gray-900">{displayCompanyName}</td>
-                    </tr>
-                    <tr>
-                      <td className="py-1 text-[13px] text-gray-900">
-                        등록번호 {displayBusinessNumber}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-1 text-[13px] text-gray-900">{displayAddress}</td>
-                    </tr>
-                    <tr>
-                      <td className="py-1 text-[13px] text-gray-900">
-                        TEL : {displayCompanyPhone}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-1 text-[13px] text-gray-900">
-                        대표 : {displayCeoName}
-                        {companySettings.stampDataUrl ? (
-                          <img
-                            src={companySettings.stampDataUrl}
-                            alt="도장"
-                            className="ml-2 inline-block h-[54px] w-[54px] object-contain align-middle"
-                          />
-                        ) : (
-                          <span className="ml-2 inline-flex h-[54px] w-[54px] rotate-[-16deg] items-center justify-center rounded-full border-2 border-red-600 text-[12px] font-bold text-red-600">
-                            직인
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <table className="w-full table-fixed border-collapse border border-gray-900">
-                <colgroup>
-                  <col style={{ width: "10%" }} />
-                  <col style={{ width: "22%" }} />
-                  <col style={{ width: "15%" }} />
-                  <col style={{ width: "7%" }} />
-                  <col style={{ width: "7%" }} />
-                  <col style={{ width: "14%" }} />
-                  <col style={{ width: "13%" }} />
-                  <col style={{ width: "12%" }} />
-                </colgroup>
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="border border-gray-900 px-2 py-1.5 text-center text-[12px] font-bold">
-                      구분
-                    </th>
-                    <th className="border border-gray-900 px-2 py-1.5 text-center text-[12px] font-bold">
-                      품목
-                    </th>
-                    <th className="border border-gray-900 px-2 py-1.5 text-center text-[12px] font-bold">
-                      규격
-                    </th>
-                    <th className="border border-gray-900 px-2 py-1.5 text-center text-[12px] font-bold">
-                      단위
-                    </th>
-                    <th className="border border-gray-900 px-2 py-1.5 text-center text-[12px] font-bold">
-                      수량
-                    </th>
-                    <th className="border border-gray-900 px-2 py-1.5 text-center text-[12px] font-bold">
-                      단가
-                    </th>
-                    <th className="border border-gray-900 px-2 py-1.5 text-center text-[12px] font-bold">
-                      공급가액
-                    </th>
-                    <th className="border border-gray-900 px-2 py-1.5 text-center text-[12px] font-bold">
-                      비고
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {previewRows.map((row, index) => (
-                    <tr key={index}>
-                      <td className="h-[30px] border border-gray-900 px-2 py-1 text-center text-[12px]">
-                        {row.category || ""}
-                      </td>
-                      <td className="h-[30px] border border-gray-900 px-2 py-1 text-left text-[12px]">
-                        {row.item || ""}
-                      </td>
-                      <td className="h-[30px] border border-gray-900 px-2 py-1 text-center text-[12px]">
-                        {row.spec || ""}
-                      </td>
-                      <td className="h-[30px] border border-gray-900 px-2 py-1 text-center text-[12px]">
-                        {row.unit || ""}
-                      </td>
-                      <td className="h-[30px] border border-gray-900 px-2 py-1 text-center text-[12px]">
-                        {row.quantity || ""}
-                      </td>
-                      <td className="h-[30px] border border-gray-900 px-2 py-1 text-right text-[12px]">
-                        {row.price || ""}
-                      </td>
-                      <td className="h-[30px] border border-gray-900 px-2 py-1 text-right text-[12px]">
-                        {row.supplyAmount || ""}
-                      </td>
-                      <td className="h-[30px] border border-gray-900 px-2 py-1 text-left text-[12px]">
-                        {row.note || ""}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              <table className="mt-[1px] w-full border-collapse">
-                <tbody>
-                  <tr>
-                    <td className="w-[70%] border border-gray-900 bg-gray-100 px-3 py-2 text-center text-[14px] font-extrabold text-gray-900">
-                      총 금 액
-                    </td>
-                    <td className="w-[30%] border border-gray-900 bg-gray-100 px-3 py-2 text-right text-[14px] font-extrabold text-gray-900">
-                      {formatNumber(totalAmount)}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <div className="mt-4 text-[13px] leading-6 text-gray-900">
-                <div className="font-bold">고객 준수사항</div>
-                <div>1. {getVatModeLabel(vatMode)}</div>
-                <div>2. 납품조건 : {deliveryCondition || "-"}</div>
-                <div>3. 유효기간 : {getDisplayDate(validUntil)}</div>
-                <div>문의사항 : {displayCompanyPhone} / {displayCompanyEmail}</div>
-                <div>계좌정보 : {displayAccountInfo}</div>
-              </div>
-
-              {companySettings.logoDataUrl ? (
-                <div className="mt-5 flex justify-end">
-                  <img
-                    src={companySettings.logoDataUrl}
-                    alt="회사 로고"
-                    className="max-h-[48px] max-w-[150px] object-contain"
-                  />
-                </div>
-              ) : null}
             </div>
           </div>
         </div>

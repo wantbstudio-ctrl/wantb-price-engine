@@ -12,10 +12,8 @@ const menuItems = [
   { label: "Dashboard", sub: "대시보드", href: "/" },
   { label: "Products", sub: "제품관리", href: "/products" },
   { label: "Estimate", sub: "견적서", href: "/estimate" },
-
-  // ✅ 추가됨 (핵심)
   { label: "Statement", sub: "거래명세표", href: "/statement" },
-
+  { label: "Price List", sub: "유통 단가표", href: "/pricelist" },
   { label: "Clients", sub: "거래처관리", href: "/clients" },
   { label: "Company Settings", sub: "회사설정", href: "/company-settings" },
   { label: "Templates", sub: "템플릿", href: "/templates" },
@@ -27,7 +25,6 @@ export default function LayoutClient({ children }: LayoutClientProps) {
 
   return (
     <div className="flex min-h-screen bg-gray-100">
-      {/* 사이드바 */}
       <aside className="no-drag w-[260px] border-r border-gray-200 bg-white px-5 py-6">
         <div className="mb-10">
           <h1 className="text-xl font-bold text-gray-900">원프앤</h1>
@@ -62,7 +59,6 @@ export default function LayoutClient({ children }: LayoutClientProps) {
         </nav>
       </aside>
 
-      {/* 메인 영역 */}
       <main className="flex-1 p-6">{children}</main>
     </div>
   );

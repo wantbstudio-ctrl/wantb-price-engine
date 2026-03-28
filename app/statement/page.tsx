@@ -1,10 +1,27 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
 type VatMode = "included" | "separate";
+type EditableField =
+  | "dateYear"
+  | "dateMonth"
+  | "dateDay"
+  | "productName"
+  | "spec"
+  | "unit"
+  | "quantity"
+  | "unitPrice"
+  | "supplyAmount";
 
 type StatementItem = {
   id: string;
@@ -39,7 +56,6 @@ type CompanySettings = {
   address?: string;
   phone?: string;
   email?: string;
-  website?: string;
   fax?: string;
   logoDataUrl?: string;
   stampDataUrl?: string;
@@ -95,7 +111,18 @@ const STORAGE_KEYS = {
   estimateDraft: "estimate-draft",
 };
 
-const PREVIEW_ROW_COUNT = 13;
+const PREVIEW_ROW_COUNT = 7;
+const EDITABLE_FIELDS: EditableField[] = [
+  "dateYear",
+  "dateMonth",
+  "dateDay",
+  "productName",
+  "spec",
+  "unit",
+  "quantity",
+  "unitPrice",
+  "supplyAmount",
+];
 
 function formatNumber(value: number) {
   if (!Number.isFinite(value)) return "0";
@@ -127,31 +154,54 @@ function makeStatementNumber(date = todayString()) {
   return `WB-ST-${compactDate}-${String(current).padStart(4, "0")}`;
 }
 
-function calculateLineAmounts(quantity: number, unitPrice: number, vatMode: VatMode) {
-  const safeQuantity = parseNumber(quantity);
+function calcFromUnitPrice(quantity: number, unitPrice: number, vatMode: VatMode) {
+  const safeQty = Math.max(1, parseNumber(quantity));
   const safeUnitPrice = parseNumber(unitPrice);
-  const rawAmount = safeQuantity * safeUnitPrice;
+  const total = safeQty * safeUnitPrice;
 
   if (vatMode === "included") {
-    const totalAmount = rawAmount;
-    const supplyAmount = Math.round(totalAmount / 1.1);
-    const taxAmount = totalAmount - supplyAmount;
+    const supplyAmount = Math.round(total / 1.1);
+    const taxAmount = total - supplyAmount;
     return {
-      quantity: safeQuantity,
+      quantity: safeQty,
       unitPrice: safeUnitPrice,
       supplyAmount,
       taxAmount,
     };
   }
 
-  const supplyAmount = rawAmount;
-  const taxAmount = Math.round(supplyAmount * 0.1);
+  return {
+    quantity: safeQty,
+    unitPrice: safeUnitPrice,
+    supplyAmount: total,
+    taxAmount: 0,
+  };
+}
+
+function calcFromSupplyAmount(quantity: number, supplyAmount: number, vatMode: VatMode) {
+  const safeQty = Math.max(1, parseNumber(quantity));
+  const safeSupply = parseNumber(supplyAmount);
+
+  if (vatMode === "included") {
+    const taxAmount = Math.round(safeSupply * 0.1);
+    const total = safeSupply + taxAmount;
+    const unitPrice = Math.round(total / safeQty);
+
+    return {
+      quantity: safeQty,
+      unitPrice,
+      supplyAmount: safeSupply,
+      taxAmount,
+    };
+  }
+
+  const unitPrice = Math.round(safeSupply / safeQty);
 
   return {
-    quantity: safeQuantity,
-    unitPrice: safeUnitPrice,
-    supplyAmount,
-    taxAmount,
+    quantity: safeQty,
+    unitPrice,
+    supplyAmount: safeSupply,
+    taxAmount: 0,
   };
 }
 
@@ -166,10 +216,38 @@ function makeItem(date = todayString()): StatementItem {
     productName: "",
     spec: "",
     unit: "EA",
-    quantity: 0,
+    quantity: 1,
     unitPrice: 0,
     supplyAmount: 0,
     taxAmount: 0,
+  };
+}
+
+function sanitizeLoadedItem(
+  item: Partial<StatementItem>,
+  vatMode: VatMode,
+  fallbackDate: string
+): StatementItem {
+  const { year, month, day } = getDateParts(fallbackDate);
+  const quantity = Math.max(1, parseNumber(item.quantity ?? 1));
+  const hasSupplyAmount = parseNumber(item.supplyAmount ?? 0) > 0;
+
+  const normalized = hasSupplyAmount
+    ? calcFromSupplyAmount(quantity, parseNumber(item.supplyAmount ?? 0), vatMode)
+    : calcFromUnitPrice(quantity, parseNumber(item.unitPrice ?? 0), vatMode);
+
+  return {
+    id: item.id || crypto.randomUUID(),
+    dateYear: item.dateYear || year,
+    dateMonth: item.dateMonth || month,
+    dateDay: item.dateDay || day,
+    productName: item.productName || "",
+    spec: item.spec || "",
+    unit: item.unit || "EA",
+    quantity: normalized.quantity,
+    unitPrice: normalized.unitPrice,
+    supplyAmount: normalized.supplyAmount,
+    taxAmount: normalized.taxAmount,
   };
 }
 
@@ -193,6 +271,124 @@ function makePreviewRows(items: StatementItem[]) {
   return rows.slice(0, PREVIEW_ROW_COUNT);
 }
 
+type LabelValueRowProps = {
+  color: string;
+  label: string;
+  value?: string;
+  last?: boolean;
+};
+
+function ReceiverInfoRow({ color, label, value = "", last = false }: LabelValueRowProps) {
+  return (
+    <div className="grid grid-cols-[118px_1fr]">
+      <div
+        className="flex h-[38px] items-center justify-center border-r text-center text-[12px] font-semibold whitespace-pre-line leading-[14px]"
+        style={{
+          color,
+          borderRight: `1px solid ${color}`,
+          borderBottom: last ? "none" : `1px solid ${color}`,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        className="flex h-[38px] items-center px-3 text-[12px] text-[#222]"
+        style={{
+          borderBottom: last ? "none" : `1px solid ${color}`,
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function SupplierSingleRow({
+  color,
+  label,
+  value = "",
+  last = false,
+}: LabelValueRowProps) {
+  return (
+    <div className="grid grid-cols-[108px_1fr]">
+      <div
+        className="flex h-[38px] items-center justify-center border-r text-center text-[12px] font-semibold whitespace-pre-line leading-[14px]"
+        style={{
+          color,
+          borderRight: `1px solid ${color}`,
+          borderBottom: last ? "none" : `1px solid ${color}`,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        className="flex h-[38px] items-center px-3 text-[12px] text-[#222]"
+        style={{
+          borderBottom: last ? "none" : `1px solid ${color}`,
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function SupplierPairRow({
+  color,
+  leftLabel,
+  leftValue,
+  rightLabel,
+  rightValue,
+}: {
+  color: string;
+  leftLabel: string;
+  leftValue: string;
+  rightLabel: string;
+  rightValue: string;
+}) {
+  return (
+    <div className="grid grid-cols-[108px_1fr_56px_1fr]">
+      <div
+        className="flex h-[38px] items-center justify-center text-center text-[12px] font-semibold whitespace-pre-line leading-[14px]"
+        style={{
+          color,
+          borderRight: `1px solid ${color}`,
+          borderBottom: `1px solid ${color}`,
+        }}
+      >
+        {leftLabel}
+      </div>
+      <div
+        className="flex h-[38px] items-center px-3 text-[12px] text-[#222]"
+        style={{
+          borderBottom: `1px solid ${color}`,
+        }}
+      >
+        {leftValue}
+      </div>
+      <div
+        className="flex h-[38px] items-center justify-center text-center text-[12px] font-semibold"
+        style={{
+          color,
+          borderLeft: `1px solid ${color}`,
+          borderRight: `1px solid ${color}`,
+          borderBottom: `1px solid ${color}`,
+        }}
+      >
+        {rightLabel}
+      </div>
+      <div
+        className="flex h-[38px] items-center px-3 text-[12px] text-[#222]"
+        style={{
+          borderBottom: `1px solid ${color}`,
+        }}
+      >
+        {rightValue}
+      </div>
+    </div>
+  );
+}
+
 type SlipPreviewProps = {
   color: string;
   titleNote: string;
@@ -209,7 +405,7 @@ type SlipPreviewProps = {
   companySettings: CompanySettings;
 };
 
-function SlipPreview({
+const SlipPreview = memo(function SlipPreview({
   color,
   titleNote,
   receiver,
@@ -224,251 +420,184 @@ function SlipPreview({
   supplierSigner,
   companySettings,
 }: SlipPreviewProps) {
-  const totalLabel =
-    vatMode === "included" ? "합계금액\n(VAT포함)" : "합계금액\n(VAT별도)";
+  const totalLabel = vatMode === "included" ? "합계금액\n(VAT포함)" : "합계금액\n(VAT별도)";
 
   return (
-    <div className="border-[1.5px]" style={{ borderColor: color }}>
+    <div className="border-[1.5px] bg-white" style={{ borderColor: color }}>
       <div
-        className="flex h-[40px] items-center justify-center border-b-[1.5px]"
+        className="flex h-[50px] items-center justify-center border-b-[1.5px]"
         style={{ borderColor: color }}
       >
         <div className="flex items-end gap-2">
-          <span
-            className="text-[22px] font-bold tracking-[8px]"
-            style={{ color }}
-          >
+          <span className="text-[26px] font-bold tracking-[6px]" style={{ color }}>
             거 래 명 세 서
           </span>
-          <span
-            className="mb-[2px] text-[12px] font-semibold"
-            style={{ color }}
-          >
+          <span className="mb-[2px] text-[13px] font-semibold" style={{ color }}>
             ({titleNote})
           </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-[24px_1fr_24px_1.06fr]">
+      <div className="grid grid-cols-[28px_1fr_28px_1.12fr]">
         <div
-          className="flex items-center justify-center border-r border-b-[1.5px] text-[11px] font-bold [writing-mode:vertical-rl]"
+          className="flex items-center justify-center border-r border-b-[1.5px] text-[12px] font-semibold [writing-mode:vertical-rl]"
           style={{ borderColor: color, color }}
         >
           공급받는자
         </div>
 
         <div className="border-r-[1.5px] border-b-[1.5px]" style={{ borderColor: color }}>
-          <div className="grid grid-cols-[98px_1fr] border-b" style={{ borderColor: color }}>
-            <div
-              className="flex h-[32px] items-center justify-center border-r text-center text-[10px] font-bold leading-[13px]"
-              style={{ borderColor: color, color }}
-            >
-              상 호
-              <br />
-              (법인명)
-            </div>
-            <div className="flex h-[32px] items-center px-2 text-[10px] text-[#222]">
-              {receiver.companyName || ""}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-[98px_1fr] border-b" style={{ borderColor: color }}>
-            <div
-              className="flex h-[32px] items-center justify-center border-r text-center text-[10px] font-bold"
-              style={{ borderColor: color, color }}
-            >
-              등록번호
-            </div>
-            <div className="flex h-[32px] items-center px-2 text-[10px] text-[#222]">
-              {receiver.businessNumber || ""}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-[98px_1fr] border-b" style={{ borderColor: color }}>
-            <div
-              className="flex h-[32px] items-center justify-center border-r text-center text-[10px] font-bold leading-[13px]"
-              style={{ borderColor: color, color }}
-            >
-              사업장
-              <br />
-              주 소
-            </div>
-            <div className="flex h-[32px] items-center px-2 text-[10px] text-[#222]">
-              {receiver.address || ""}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-[98px_1fr] border-b" style={{ borderColor: color }}>
-            <div
-              className="flex h-[32px] items-center justify-center border-r text-center text-[10px] font-bold"
-              style={{ borderColor: color, color }}
-            >
-              전화번호
-            </div>
-            <div className="flex h-[32px] items-center px-2 text-[10px] text-[#222]">
-              {receiver.phone || ""}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-[98px_1fr]" style={{ borderColor: color }}>
-            <div
-              className="flex h-[32px] items-center justify-center border-r whitespace-pre-line text-center text-[10px] font-bold leading-[13px]"
-              style={{ borderColor: color, color }}
-            >
-              {totalLabel}
-            </div>
-            <div className="flex h-[32px] items-center justify-end px-2 text-[11px] font-semibold text-[#222]">
-              {formatNumber(totalAmount)}
-            </div>
-          </div>
+          <ReceiverInfoRow color={color} label={"상 호\n(법인명)"} value={receiver.companyName || ""} />
+          <ReceiverInfoRow color={color} label="등록번호" value={receiver.businessNumber || ""} />
+          <ReceiverInfoRow color={color} label={"사업장\n주 소"} value={receiver.address || ""} />
+          <ReceiverInfoRow color={color} label="전화번호" value={receiver.phone || ""} />
+          <ReceiverInfoRow color={color} label="팩스" value={receiver.fax || ""} />
+          <ReceiverInfoRow color={color} label={totalLabel} value={formatNumber(totalAmount)} last />
         </div>
 
         <div
-          className="flex items-center justify-center border-r border-b-[1.5px] text-[11px] font-bold [writing-mode:vertical-rl]"
+          className="flex items-center justify-center border-r border-b-[1.5px] text-[12px] font-semibold [writing-mode:vertical-rl]"
           style={{ borderColor: color, color }}
         >
           공급자
         </div>
 
         <div className="border-b-[1.5px]" style={{ borderColor: color }}>
-          <div className="grid grid-cols-[90px_1fr] border-b" style={{ borderColor: color }}>
-            <div
-              className="flex h-[32px] items-center justify-center border-r text-center text-[10px] font-bold"
-              style={{ borderColor: color, color }}
-            >
-              등록번호
-            </div>
-            <div className="flex h-[32px] items-center px-2 text-[10px] font-semibold text-[#222]">
-              {supplier.businessNumber || ""}
-            </div>
-          </div>
+          <SupplierSingleRow color={color} label="등록번호" value={supplier.businessNumber || ""} />
 
-          <div className="grid grid-cols-[90px_1fr_44px_1fr] border-b" style={{ borderColor: color }}>
-            <div
-              className="flex h-[32px] items-center justify-center border-r text-center text-[10px] font-bold leading-[13px]"
-              style={{ borderColor: color, color }}
-            >
-              상 호
-              <br />
-              (법인명)
-            </div>
-            <div className="flex h-[32px] items-center px-2 text-[10px] text-[#222]">
-              {supplier.companyName || ""}
-            </div>
-            <div
-              className="flex h-[32px] items-center justify-center border-l border-r text-center text-[10px] font-bold"
-              style={{ borderColor: color, color }}
-            >
-              성 명
-            </div>
-            <div className="relative flex h-[32px] items-center px-2 text-[10px] text-[#222]">
-              <span>{supplier.ceoName || ""}</span>
-              {companySettings.stampDataUrl ? (
-                <img
-                  src={companySettings.stampDataUrl}
-                  alt="stamp"
-                  className="absolute right-2 top-1/2 h-[24px] -translate-y-1/2 object-contain opacity-90"
-                />
-              ) : null}
-            </div>
-          </div>
+          <SupplierPairRow
+            color={color}
+            leftLabel={"상 호\n(법인명)"}
+            leftValue={supplier.companyName || ""}
+            rightLabel="성 명"
+            rightValue={supplier.ceoName || ""}
+          />
 
-          <div className="grid grid-cols-[90px_1fr] border-b" style={{ borderColor: color }}>
-            <div
-              className="flex h-[32px] items-center justify-center border-r text-center text-[10px] font-bold leading-[13px]"
-              style={{ borderColor: color, color }}
-            >
-              사업장
-              <br />
-              주 소
-            </div>
-            <div className="flex h-[32px] items-center px-2 text-[10px] text-[#222]">
-              {supplier.address || ""}
-            </div>
-          </div>
+          <SupplierSingleRow color={color} label={"사업장\n주 소"} value={supplier.address || ""} />
 
-          <div className="grid grid-cols-[90px_1fr_42px_1fr_42px_1fr]" style={{ borderColor: color }}>
+          <div className="grid grid-cols-[108px_1fr_56px_1fr]">
             <div
-              className="flex h-[32px] items-center justify-center border-r text-center text-[10px] font-bold"
-              style={{ borderColor: color, color }}
+              className="flex h-[40px] items-center justify-center text-center text-[12px] font-semibold"
+              style={{
+                color,
+                borderRight: `1px solid ${color}`,
+                borderBottom: `1px solid ${color}`,
+              }}
             >
               전 화
             </div>
-            <div className="flex h-[32px] items-center px-2 text-[10px] text-[#222]">
+            <div
+              className="flex h-[40px] items-center px-3 text-[14px] text-[#222]"
+              style={{
+                borderRight: `1px solid ${color}`,
+                borderBottom: `1px solid ${color}`,
+              }}
+            >
               {supplier.phone || ""}
             </div>
             <div
-              className="flex h-[32px] items-center justify-center border-l border-r text-center text-[10px] font-bold"
-              style={{ borderColor: color, color }}
+              className="flex h-[40px] items-center justify-center text-center text-[12px] font-semibold"
+              style={{
+                color,
+                borderRight: `1px solid ${color}`,
+                borderBottom: `1px solid ${color}`,
+              }}
             >
               팩 스
             </div>
-            <div className="flex h-[32px] items-center px-2 text-[10px] text-[#222]">
+            <div
+              className="flex h-[40px] items-center px-3 text-[14px] text-[#222]"
+              style={{
+                borderBottom: `1px solid ${color}`,
+              }}
+            >
               {supplier.fax || ""}
             </div>
+          </div>
+
+          <div className="grid grid-cols-[108px_1fr]">
             <div
-              className="flex h-[32px] items-center justify-center border-l border-r text-center text-[10px] font-bold"
-              style={{ borderColor: color, color }}
+              className="flex h-[34px] items-center justify-center border-r text-center text-[12px] font-semibold"
+              style={{
+                color,
+                borderRight: `1px solid ${color}`,
+                borderBottom: `1px solid ${color}`,
+              }}
             >
               VAT
             </div>
-            <div className="flex h-[32px] items-center px-2 text-[10px] font-semibold text-[#222]">
+            <div
+              className="flex h-[34px] items-center px-3 text-[12px] text-[#222]"
+              style={{
+                borderBottom: `1px solid ${color}`,
+              }}
+            >
               {vatMode === "included" ? "포함" : "별도"}
             </div>
           </div>
+
+          {companySettings.stampDataUrl ? (
+            <div className="relative h-0">
+              <img
+                src={companySettings.stampDataUrl}
+                alt="stamp"
+                className="absolute right-3 top-[-103px] h-[28px] object-contain opacity-90"
+              />
+            </div>
+          ) : null}
         </div>
       </div>
 
       <div
-        className="grid grid-cols-[22px_22px_22px_1.72fr_0.82fr_0.68fr_0.76fr_0.9fr_0.98fr_0.9fr] border-b"
+        className="grid grid-cols-[28px_28px_28px_2.1fr_0.95fr_0.8fr_0.9fr_1.1fr_1.15fr_1.05fr] border-b"
         style={{ borderColor: color, color }}
       >
-        <div className="flex h-[23px] items-center justify-center border-r text-[9px] font-bold" style={{ borderColor: color }}>년</div>
-        <div className="flex h-[23px] items-center justify-center border-r text-[9px] font-bold" style={{ borderColor: color }}>월</div>
-        <div className="flex h-[23px] items-center justify-center border-r text-[9px] font-bold" style={{ borderColor: color }}>일</div>
-        <div className="flex h-[23px] items-center justify-center border-r text-[9px] font-bold" style={{ borderColor: color }}>품 목</div>
-        <div className="flex h-[23px] items-center justify-center border-r text-[9px] font-bold" style={{ borderColor: color }}>규격</div>
-        <div className="flex h-[23px] items-center justify-center border-r text-[9px] font-bold" style={{ borderColor: color }}>단위</div>
-        <div className="flex h-[23px] items-center justify-center border-r text-[9px] font-bold" style={{ borderColor: color }}>수량</div>
-        <div className="flex h-[23px] items-center justify-center border-r text-[9px] font-bold" style={{ borderColor: color }}>단가</div>
-        <div className="flex h-[23px] items-center justify-center border-r text-[9px] font-bold" style={{ borderColor: color }}>공급가액</div>
-        <div className="flex h-[23px] items-center justify-center text-[9px] font-bold">세액</div>
+        <div className="flex h-[28px] items-center justify-center border-r text-[11px] font-semibold" style={{ borderColor: color }}>년</div>
+        <div className="flex h-[28px] items-center justify-center border-r text-[11px] font-semibold" style={{ borderColor: color }}>월</div>
+        <div className="flex h-[28px] items-center justify-center border-r text-[11px] font-semibold" style={{ borderColor: color }}>일</div>
+        <div className="flex h-[28px] items-center justify-center border-r text-[11px] font-semibold" style={{ borderColor: color }}>품 목</div>
+        <div className="flex h-[28px] items-center justify-center border-r text-[11px] font-semibold" style={{ borderColor: color }}>규격</div>
+        <div className="flex h-[28px] items-center justify-center border-r text-[11px] font-semibold" style={{ borderColor: color }}>단위</div>
+        <div className="flex h-[28px] items-center justify-center border-r text-[11px] font-semibold" style={{ borderColor: color }}>수량</div>
+        <div className="flex h-[28px] items-center justify-center border-r text-[11px] font-semibold" style={{ borderColor: color }}>단가</div>
+        <div className="flex h-[28px] items-center justify-center border-r text-[11px] font-semibold" style={{ borderColor: color }}>공급가액</div>
+        <div className="flex h-[28px] items-center justify-center text-[11px] font-semibold">세액</div>
       </div>
 
       {previewRows.map((row, idx) => (
         <div
           key={`${titleNote}-${row.id}-${idx}`}
-          className="grid grid-cols-[22px_22px_22px_1.72fr_0.82fr_0.68fr_0.76fr_0.9fr_0.98fr_0.9fr] border-b text-[#222]"
+          className="grid grid-cols-[28px_28px_28px_2.1fr_0.95fr_0.8fr_0.9fr_1.1fr_1.15fr_1.05fr] border-b text-[#222]"
           style={{ borderColor: color }}
         >
-          <div className="flex h-[19px] items-center justify-center border-r text-[8px]" style={{ borderColor: color }}>
+          <div className="flex h-[24px] items-center justify-center border-r text-[10px]" style={{ borderColor: color }}>
             {row.dateYear ? row.dateYear.slice(-2) : ""}
           </div>
-          <div className="flex h-[19px] items-center justify-center border-r text-[8px]" style={{ borderColor: color }}>
+          <div className="flex h-[24px] items-center justify-center border-r text-[10px]" style={{ borderColor: color }}>
             {row.dateMonth || ""}
           </div>
-          <div className="flex h-[19px] items-center justify-center border-r text-[8px]" style={{ borderColor: color }}>
+          <div className="flex h-[24px] items-center justify-center border-r text-[10px]" style={{ borderColor: color }}>
             {row.dateDay || ""}
           </div>
-          <div className="flex h-[19px] items-center border-r px-1.5 text-[8px]" style={{ borderColor: color }}>
+          <div className="flex h-[24px] items-center border-r px-2 text-[10px]" style={{ borderColor: color }}>
             {row.productName || ""}
           </div>
-          <div className="flex h-[19px] items-center border-r px-1.5 text-[8px]" style={{ borderColor: color }}>
+          <div className="flex h-[24px] items-center border-r px-2 text-[10px]" style={{ borderColor: color }}>
             {row.spec || ""}
           </div>
-          <div className="flex h-[19px] items-center justify-center border-r px-1 text-[8px]" style={{ borderColor: color }}>
+          <div className="flex h-[24px] items-center justify-center border-r px-1 text-[10px]" style={{ borderColor: color }}>
             {row.unit || ""}
           </div>
-          <div className="flex h-[19px] items-center justify-end border-r px-1.5 text-[8px]" style={{ borderColor: color }}>
+          <div className="flex h-[24px] items-center justify-end border-r px-2 text-[10px]" style={{ borderColor: color }}>
             {row.quantity ? formatNumber(row.quantity) : ""}
           </div>
-          <div className="flex h-[19px] items-center justify-end border-r px-1.5 text-[8px]" style={{ borderColor: color }}>
+          <div className="flex h-[24px] items-center justify-end border-r px-2 text-[10px]" style={{ borderColor: color }}>
             {row.unitPrice ? formatNumber(row.unitPrice) : ""}
           </div>
-          <div className="flex h-[19px] items-center justify-end border-r px-1.5 text-[8px]" style={{ borderColor: color }}>
+          <div className="flex h-[24px] items-center justify-end border-r px-2 text-[10px]" style={{ borderColor: color }}>
             {row.supplyAmount ? formatNumber(row.supplyAmount) : ""}
           </div>
-          <div className="flex h-[19px] items-center justify-end px-1.5 text-[8px]">
+          <div className="flex h-[24px] items-center justify-end px-2 text-[10px]">
             {row.taxAmount ? formatNumber(row.taxAmount) : ""}
           </div>
         </div>
@@ -478,59 +607,307 @@ function SlipPreview({
         className="grid grid-cols-[1fr_1fr_1.1fr] border-b"
         style={{ borderColor: color }}
       >
-        <div className="flex h-[26px] items-center justify-between border-r px-2 text-[10px] font-bold" style={{ borderColor: color, color }}>
+        <div className="flex h-[30px] items-center justify-between border-r px-3 text-[12px] font-semibold" style={{ borderColor: color, color }}>
           <span>공급가액</span>
           <span className="text-[#222]">{formatNumber(totalSupplyAmount)}</span>
         </div>
-        <div className="flex h-[26px] items-center justify-between border-r px-2 text-[10px] font-bold" style={{ borderColor: color, color }}>
+        <div className="flex h-[30px] items-center justify-between border-r px-3 text-[12px] font-semibold" style={{ borderColor: color, color }}>
           <span>세액</span>
           <span className="text-[#222]">{formatNumber(totalTaxAmount)}</span>
         </div>
-        <div className="flex h-[26px] items-center justify-between px-2 text-[10px] font-bold" style={{ color }}>
+        <div className="flex h-[30px] items-center justify-between px-3 text-[12px] font-semibold" style={{ color }}>
           <span>{vatMode === "included" ? "총합계(VAT포함)" : "총합계(VAT별도)"}</span>
           <span className="text-[#222]">{formatNumber(totalAmount)}</span>
         </div>
       </div>
 
-      <div
-        className="grid grid-cols-[1fr_0.8fr_1fr_0.8fr_0.95fr_1.15fr]"
-        style={{ color }}
-      >
+      <div className="grid grid-cols-[1fr_0.8fr_1fr_0.8fr_0.95fr_1.15fr]" style={{ color }}>
         <div
-          className="flex h-[28px] items-center justify-center border-r border-t text-[10px] font-bold"
+          className="flex h-[32px] items-center justify-center border-r border-t text-[12px] font-semibold"
           style={{ borderColor: color }}
         >
           인 수 자
         </div>
         <div
-          className="flex h-[28px] items-center justify-center border-r border-t px-2 text-[10px] font-semibold text-[#222]"
+          className="flex h-[32px] items-center justify-center border-r border-t px-2 text-[12px] text-[#222]"
           style={{ borderColor: color }}
         >
           {receiverSigner}
         </div>
         <div
-          className="flex h-[28px] items-center justify-center border-r border-t text-[10px] font-bold"
+          className="flex h-[32px] items-center justify-center border-r border-t text-[12px] font-semibold"
           style={{ borderColor: color }}
         >
           납 품 자
         </div>
         <div
-          className="flex h-[28px] items-center justify-center border-r border-t px-2 text-[10px] font-semibold text-[#222]"
+          className="flex h-[32px] items-center justify-center border-r border-t px-2 text-[12px] text-[#222]"
           style={{ borderColor: color }}
         >
           {supplierSigner}
         </div>
         <div
-          className="flex h-[28px] items-center justify-center border-r border-t text-[10px] font-bold"
+          className="flex h-[32px] items-center justify-center border-r border-t text-[12px] font-semibold"
           style={{ borderColor: color }}
         >
           미 수 금
         </div>
         <div
-          className="flex h-[28px] items-center justify-end border-t px-3 text-[10px] font-bold text-[#222]"
+          className="flex h-[32px] items-center justify-end border-t px-3 text-[12px] text-[#222]"
           style={{ borderColor: color }}
         >
           {formatNumber(unpaidAmount)}
+        </div>
+      </div>
+    </div>
+  );
+});
+
+type ItemTableProps = {
+  items: StatementItem[];
+  vatMode: VatMode;
+  onChange: (id: string, key: keyof StatementItem, value: string | number) => void;
+  onRemove: (id: string) => void;
+  onAdd: () => void;
+  registerInput: (itemId: string, field: EditableField, el: HTMLInputElement | null) => void;
+  onCellEnter: (rowIndex: number, field: EditableField) => void;
+};
+
+function ItemTable({
+  items,
+  vatMode,
+  onChange,
+  onRemove,
+  onAdd,
+  registerInput,
+  onCellEnter,
+}: ItemTableProps) {
+  return (
+    <div className="rounded-[24px] border border-gray-200 bg-[#fbfbfc]">
+      <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+        <div>
+          <h2 className="text-[16px] font-semibold text-gray-900">품목 정보</h2>
+          <p className="mt-1 text-[12px] text-gray-500">
+            단가 또는 공급가액 중 편한 방식으로 입력할 수 있습니다.
+          </p>
+        </div>
+        <button
+          onClick={onAdd}
+          className="rounded-2xl bg-gray-900 px-4 py-2 text-[13px] font-medium text-white"
+        >
+          행 추가
+        </button>
+      </div>
+
+      <div className="overflow-x-auto">
+        <div className="min-w-[1490px]">
+          <div className="grid grid-cols-[64px_64px_64px_minmax(220px,2.1fr)_minmax(130px,1fr)_90px_100px_140px_150px_140px_78px] border-b border-gray-200 bg-[#f3f5f8] text-[12px] font-semibold text-gray-700">
+            <div className="flex h-11 items-center justify-center border-r border-gray-200">년</div>
+            <div className="flex h-11 items-center justify-center border-r border-gray-200">월</div>
+            <div className="flex h-11 items-center justify-center border-r border-gray-200">일</div>
+            <div className="flex h-11 items-center border-r border-gray-200 px-3">품목</div>
+            <div className="flex h-11 items-center border-r border-gray-200 px-3">규격</div>
+            <div className="flex h-11 items-center justify-center border-r border-gray-200">단위</div>
+            <div className="flex h-11 items-center justify-center border-r border-gray-200">수량</div>
+            <div className="flex h-11 items-center justify-center border-r border-gray-200">
+              {vatMode === "included" ? "단가(VAT포함)" : "단가(VAT별도)"}
+            </div>
+            <div className="flex h-11 items-center justify-center border-r border-gray-200">공급가액</div>
+            <div className="flex h-11 items-center justify-center border-r border-gray-200">세액</div>
+            <div className="flex h-11 items-center justify-center">삭제</div>
+          </div>
+
+          <div className="max-h-[540px] overflow-y-auto">
+            {items.map((item, index) => (
+              <div
+                key={item.id}
+                className="grid grid-cols-[64px_64px_64px_minmax(220px,2.1fr)_minmax(130px,1fr)_90px_100px_140px_150px_140px_78px] border-b border-gray-200 bg-white text-[13px]"
+              >
+                <div className="border-r border-gray-200 p-2">
+                  <input
+                    ref={(el) => registerInput(item.id, "dateYear", el)}
+                    value={item.dateYear}
+                    onChange={(e) => onChange(item.id, "dateYear", e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        onCellEnter(index, "dateYear");
+                      }
+                    }}
+                    className="h-10 w-full rounded-xl border border-gray-300 bg-white px-2 text-center outline-none focus:border-gray-900"
+                  />
+                </div>
+
+                <div className="border-r border-gray-200 p-2">
+                  <input
+                    ref={(el) => registerInput(item.id, "dateMonth", el)}
+                    value={item.dateMonth}
+                    onChange={(e) => onChange(item.id, "dateMonth", e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        onCellEnter(index, "dateMonth");
+                      }
+                    }}
+                    className="h-10 w-full rounded-xl border border-gray-300 bg-white px-2 text-center outline-none focus:border-gray-900"
+                  />
+                </div>
+
+                <div className="border-r border-gray-200 p-2">
+                  <input
+                    ref={(el) => registerInput(item.id, "dateDay", el)}
+                    value={item.dateDay}
+                    onChange={(e) => onChange(item.id, "dateDay", e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        onCellEnter(index, "dateDay");
+                      }
+                    }}
+                    className="h-10 w-full rounded-xl border border-gray-300 bg-white px-2 text-center outline-none focus:border-gray-900"
+                  />
+                </div>
+
+                <div className="border-r border-gray-200 p-2">
+                  <input
+                    ref={(el) => registerInput(item.id, "productName", el)}
+                    value={item.productName}
+                    onChange={(e) => onChange(item.id, "productName", e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        onCellEnter(index, "productName");
+                      }
+                    }}
+                    placeholder={`품목 ${index + 1}`}
+                    className="h-10 w-full rounded-xl border border-gray-300 bg-white px-3 outline-none focus:border-gray-900"
+                  />
+                </div>
+
+                <div className="border-r border-gray-200 p-2">
+                  <input
+                    ref={(el) => registerInput(item.id, "spec", el)}
+                    value={item.spec}
+                    onChange={(e) => onChange(item.id, "spec", e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        onCellEnter(index, "spec");
+                      }
+                    }}
+                    placeholder="규격"
+                    className="h-10 w-full rounded-xl border border-gray-300 bg-white px-3 outline-none focus:border-gray-900"
+                  />
+                </div>
+
+                <div className="border-r border-gray-200 p-2">
+                  <input
+                    ref={(el) => registerInput(item.id, "unit", el)}
+                    value={item.unit}
+                    onChange={(e) => onChange(item.id, "unit", e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        onCellEnter(index, "unit");
+                      }
+                    }}
+                    className="h-10 w-full rounded-xl border border-gray-300 bg-white px-2 text-center outline-none focus:border-gray-900"
+                  />
+                </div>
+
+                <div className="border-r border-gray-200 p-2">
+                  <input
+                    ref={(el) => registerInput(item.id, "quantity", el)}
+                    type="number"
+                    value={item.quantity === 0 ? "" : item.quantity}
+                    onFocus={(e) => {
+                      if (item.quantity === 0) e.target.value = "";
+                    }}
+                    onBlur={(e) => {
+                      if (e.target.value === "") {
+                        onChange(item.id, "quantity", 1);
+                      }
+                    }}
+                    onChange={(e) => onChange(item.id, "quantity", Number(e.target.value || 1))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        onCellEnter(index, "quantity");
+                      }
+                    }}
+                    className="h-10 w-full rounded-xl border border-gray-300 bg-white px-3 text-right outline-none focus:border-gray-900"
+                  />
+                </div>
+
+                <div className="border-r border-gray-200 p-2">
+                  <input
+                    ref={(el) => registerInput(item.id, "unitPrice", el)}
+                    type="number"
+                    value={item.unitPrice === 0 ? "" : item.unitPrice}
+                    onFocus={(e) => {
+                      if (item.unitPrice === 0) e.target.value = "";
+                    }}
+                    onBlur={(e) => {
+                      if (e.target.value === "") {
+                        onChange(item.id, "unitPrice", 0);
+                      }
+                    }}
+                    onChange={(e) => onChange(item.id, "unitPrice", Number(e.target.value || 0))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        onCellEnter(index, "unitPrice");
+                      }
+                    }}
+                    className="h-10 w-full rounded-xl border border-gray-300 bg-white px-3 text-right outline-none focus:border-gray-900"
+                  />
+                </div>
+
+                <div className="border-r border-gray-200 p-2">
+                  <input
+                    ref={(el) => registerInput(item.id, "supplyAmount", el)}
+                    type="number"
+                    value={item.supplyAmount === 0 ? "" : item.supplyAmount}
+                    onFocus={(e) => {
+                      if (item.supplyAmount === 0) e.target.value = "";
+                    }}
+                    onBlur={(e) => {
+                      if (e.target.value === "") {
+                        onChange(item.id, "supplyAmount", 0);
+                      }
+                    }}
+                    onChange={(e) => onChange(item.id, "supplyAmount", Number(e.target.value || 0))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        onCellEnter(index, "supplyAmount");
+                      }
+                    }}
+                    className="h-10 w-full rounded-xl border border-gray-300 bg-white px-3 text-right outline-none focus:border-gray-900"
+                  />
+                </div>
+
+                <div className="border-r border-gray-200 p-2">
+                  <div className="flex h-10 items-center justify-end rounded-xl border border-gray-200 bg-gray-100 px-3 text-[13px] text-gray-700">
+                    {formatNumber(item.taxAmount)}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-center p-2">
+                  <button
+                    onClick={() => onRemove(item.id)}
+                    className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-600"
+                  >
+                    삭제
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {items.length === 0 ? (
+              <div className="p-6 text-center text-[13px] text-gray-500">품목이 없습니다.</div>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>
@@ -539,9 +916,9 @@ function SlipPreview({
 
 export default function StatementPage() {
   const previewRef = useRef<HTMLDivElement>(null);
+  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const [mounted, setMounted] = useState(false);
-
   const [statementId, setStatementId] = useState("");
   const [statementNumber, setStatementNumber] = useState("");
   const [statementDate, setStatementDate] = useState(todayString());
@@ -569,18 +946,13 @@ export default function StatementPage() {
 
   const [receiverSigner, setReceiverSigner] = useState("");
   const [supplierSigner, setSupplierSigner] = useState("");
-
-  const [items, setItems] = useState<StatementItem[]>([
-    makeItem(),
-    makeItem(),
-    makeItem(),
-  ]);
-
+  const [items, setItems] = useState<StatementItem[]>([makeItem(), makeItem(), makeItem()]);
   const [notes, setNotes] = useState("상기와 같이 거래명세 내역을 확인드립니다.");
   const [unpaidAmount, setUnpaidAmount] = useState(0);
 
   const [companySettings, setCompanySettings] = useState<CompanySettings>({});
   const [savedStatements, setSavedStatements] = useState<SavedStatement[]>([]);
+  const [pendingFocus, setPendingFocus] = useState<{ rowIndex: number; field: EditableField } | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -608,8 +980,8 @@ export default function StatementPage() {
         const parsed = JSON.parse(savedSelectedClient);
         setReceiver((prev) => ({
           ...prev,
-          companyName: parsed.companyName || "",
-          managerName: parsed.managerName || "",
+          companyName: parsed.companyName || parsed.name || "",
+          managerName: parsed.managerName || parsed.owner || "",
           phone: parsed.phone || "",
           email: parsed.email || "",
           address: parsed.address || "",
@@ -617,7 +989,7 @@ export default function StatementPage() {
           businessNumber: parsed.businessNumber || "",
           memo: parsed.memo || "",
         }));
-        setReceiverSigner(parsed.managerName || "");
+        setReceiverSigner(parsed.managerName || parsed.owner || "");
       } catch {}
     }
 
@@ -625,7 +997,6 @@ export default function StatementPage() {
     if (savedEstimateDraft) {
       try {
         const parsed: EstimateDraft = JSON.parse(savedEstimateDraft);
-
         setReceiver((prev) => ({
           ...prev,
           companyName: prev.companyName || parsed.clientName || "",
@@ -640,22 +1011,18 @@ export default function StatementPage() {
 
         if (Array.isArray(parsed.items) && parsed.items.length > 0) {
           const currentDate = todayString();
-          const mapped = parsed.items.map((item) => {
-            const quantity = parseNumber(item.quantity || 0);
-            const unitPrice = parseNumber(item.unitPrice ?? item.supplyPrice ?? 0);
-            const amounts = calculateLineAmounts(quantity, unitPrice, "included");
-
-            return {
-              ...makeItem(currentDate),
-              productName: item.productName || "",
-              unit: "EA",
-              quantity: amounts.quantity,
-              unitPrice: amounts.unitPrice,
-              supplyAmount: amounts.supplyAmount,
-              taxAmount: amounts.taxAmount,
-            };
-          });
-
+          const mapped = parsed.items.map((item) =>
+            sanitizeLoadedItem(
+              {
+                productName: item.productName || "",
+                quantity: parseNumber(item.quantity || 1),
+                unitPrice: parseNumber(item.unitPrice ?? item.supplyPrice ?? 0),
+                unit: "EA",
+              },
+              "included",
+              currentDate
+            )
+          );
           setItems(mapped);
         }
       } catch {}
@@ -672,19 +1039,26 @@ export default function StatementPage() {
     setStatementNumber(makeStatementNumber(todayString()));
   }, []);
 
-  const normalizedItems = useMemo(() => {
-    return items.map((item) => {
-      const amounts = calculateLineAmounts(item.quantity, item.unitPrice, vatMode);
+  useEffect(() => {
+    if (!pendingFocus) return;
+    const targetItem = items[pendingFocus.rowIndex];
+    if (!targetItem) return;
 
-      return {
-        ...item,
-        quantity: amounts.quantity,
-        unitPrice: amounts.unitPrice,
-        supplyAmount: amounts.supplyAmount,
-        taxAmount: amounts.taxAmount,
-      };
-    });
-  }, [items, vatMode]);
+    const key = `${targetItem.id}-${pendingFocus.field}`;
+    const el = inputRefs.current[key];
+
+    if (el) {
+      requestAnimationFrame(() => {
+        el.focus();
+        el.select?.();
+      });
+      setPendingFocus(null);
+    }
+  }, [items, pendingFocus]);
+
+  const normalizedItems = useMemo(() => {
+    return items.map((item) => sanitizeLoadedItem(item, vatMode, statementDate));
+  }, [items, vatMode, statementDate]);
 
   const totalSupplyAmount = useMemo(
     () => normalizedItems.reduce((sum, item) => sum + item.supplyAmount, 0),
@@ -696,11 +1070,27 @@ export default function StatementPage() {
     [normalizedItems]
   );
 
-  const totalAmount = useMemo(() => {
-    return totalSupplyAmount + totalTaxAmount;
-  }, [totalSupplyAmount, totalTaxAmount]);
+  const totalAmount = useMemo(
+    () => totalSupplyAmount + totalTaxAmount,
+    [totalSupplyAmount, totalTaxAmount]
+  );
 
   const previewRows = useMemo(() => makePreviewRows(normalizedItems), [normalizedItems]);
+
+  const deferredReceiver = useDeferredValue(receiver);
+  const deferredSupplier = useDeferredValue(supplier);
+  const deferredPreviewRows = useDeferredValue(previewRows);
+  const deferredVatMode = useDeferredValue(vatMode);
+  const deferredTotalSupplyAmount = useDeferredValue(totalSupplyAmount);
+  const deferredTotalTaxAmount = useDeferredValue(totalTaxAmount);
+  const deferredTotalAmount = useDeferredValue(totalAmount);
+  const deferredUnpaidAmount = useDeferredValue(unpaidAmount);
+  const deferredReceiverSigner = useDeferredValue(receiverSigner);
+  const deferredSupplierSigner = useDeferredValue(supplierSigner);
+  const deferredCompanySettings = useDeferredValue(companySettings);
+  const deferredNotes = useDeferredValue(notes);
+  const deferredStatementNumber = useDeferredValue(statementNumber);
+  const deferredStatementDate = useDeferredValue(statementDate);
 
   function syncSavedStatements(next: SavedStatement[]) {
     setSavedStatements(next);
@@ -731,31 +1121,48 @@ export default function StatementPage() {
 
   function handleVatModeChange(nextMode: VatMode) {
     setVatMode(nextMode);
+
+    setItems((prev) =>
+      prev.map((item) => {
+        const hasSupply = item.supplyAmount > 0;
+
+        const next = hasSupply
+          ? calcFromSupplyAmount(item.quantity, item.supplyAmount, nextMode)
+          : calcFromUnitPrice(item.quantity, item.unitPrice, nextMode);
+
+        return {
+          ...item,
+          quantity: next.quantity,
+          unitPrice: next.unitPrice,
+          supplyAmount: next.supplyAmount,
+          taxAmount: next.taxAmount,
+        };
+      })
+    );
   }
 
-  function handleItemChange(
-    id: string,
-    key: keyof StatementItem,
-    value: string | number
-  ) {
+  function handleItemChange(id: string, key: keyof StatementItem, value: string | number) {
     setItems((prev) =>
       prev.map((item) => {
         if (item.id !== id) return item;
 
-        const next = {
-          ...item,
-          [key]: value,
-        };
+        const base = { ...item, [key]: value };
 
-        const amounts = calculateLineAmounts(next.quantity, next.unitPrice, vatMode);
+        if (key === "quantity" || key === "unitPrice") {
+          const next = calcFromUnitPrice(
+            key === "quantity" ? Number(value || 1) : base.quantity,
+            key === "unitPrice" ? Number(value || 0) : base.unitPrice,
+            vatMode
+          );
+          return { ...base, ...next };
+        }
 
-        return {
-          ...next,
-          quantity: amounts.quantity,
-          unitPrice: amounts.unitPrice,
-          supplyAmount: amounts.supplyAmount,
-          taxAmount: amounts.taxAmount,
-        };
+        if (key === "supplyAmount") {
+          const next = calcFromSupplyAmount(base.quantity, Number(value || 0), vatMode);
+          return { ...base, ...next };
+        }
+
+        return base;
       })
     );
   }
@@ -772,9 +1179,24 @@ export default function StatementPage() {
     setItems((prev) => prev.filter((item) => item.id !== id));
   }
 
+  function registerInput(itemId: string, field: EditableField, el: HTMLInputElement | null) {
+    inputRefs.current[`${itemId}-${field}`] = el;
+  }
+
+  function handleCellEnter(rowIndex: number, field: EditableField) {
+    const nextRowIndex = rowIndex + 1;
+
+    if (nextRowIndex < items.length) {
+      setPendingFocus({ rowIndex: nextRowIndex, field });
+      return;
+    }
+
+    setItems((prev) => [...prev, makeItem(statementDate)]);
+    setPendingFocus({ rowIndex: nextRowIndex, field });
+  }
+
   function resetForm() {
     const nextDate = todayString();
-
     setStatementId(crypto.randomUUID());
     setStatementNumber(makeStatementNumber(nextDate));
     setStatementDate(nextDate);
@@ -816,59 +1238,76 @@ export default function StatementPage() {
     };
 
     const existingIndex = savedStatements.findIndex((item) => item.id === payload.id);
-    let next: SavedStatement[] = [];
-
-    if (existingIndex >= 0) {
-      next = [...savedStatements];
-      next[existingIndex] = payload;
-    } else {
-      next = [payload, ...savedStatements];
-    }
+    const next =
+      existingIndex >= 0
+        ? savedStatements.map((item, index) => (index === existingIndex ? payload : item))
+        : [payload, ...savedStatements];
 
     syncSavedStatements(next);
-    alert("거래명세표가 저장되었습니다.");
+    alert("거래명세서가 저장되었습니다.");
   }
 
   function loadStatement(data: SavedStatement) {
-    setStatementId(data.id);
-    setStatementNumber(data.statementNumber);
-    setStatementDate(data.statementDate);
-    setVatMode(data.vatMode || "included");
-    setReceiver(data.receiver);
-    setSupplier(data.supplier);
-    setItems(
-      data.items.map((item) => ({
-        ...item,
-        unit: item.unit || "EA",
-      }))
-    );
-    setNotes(data.notes);
-    setUnpaidAmount(data.unpaidAmount || 0);
-    setReceiverSigner(data.receiverSigner || data.receiver.managerName || "");
-    setSupplierSigner(data.supplierSigner || data.supplier.ceoName || "");
+    const safeVatMode: VatMode = data.vatMode || "included";
+    const safeDate = data.statementDate || todayString();
+
+    const safeReceiver: ClientData = {
+      companyName: data.receiver?.companyName || "",
+      managerName: data.receiver?.managerName || "",
+      phone: data.receiver?.phone || "",
+      email: data.receiver?.email || "",
+      address: data.receiver?.address || "",
+      fax: data.receiver?.fax || "",
+      businessNumber: data.receiver?.businessNumber || "",
+      memo: data.receiver?.memo || "",
+      id: data.receiver?.id,
+    };
+
+    const safeSupplier: SupplierData = {
+      companyName: data.supplier?.companyName || "",
+      ceoName: data.supplier?.ceoName || "",
+      businessNumber: data.supplier?.businessNumber || "",
+      address: data.supplier?.address || "",
+      phone: data.supplier?.phone || "",
+      fax: data.supplier?.fax || "",
+    };
+
+    const safeItems =
+      Array.isArray(data.items) && data.items.length > 0
+        ? data.items.map((item) => sanitizeLoadedItem(item, safeVatMode, safeDate))
+        : [makeItem(safeDate)];
+
+    setStatementId(data.id || crypto.randomUUID());
+    setStatementNumber(data.statementNumber || makeStatementNumber(safeDate));
+    setStatementDate(safeDate);
+    setVatMode(safeVatMode);
+    setReceiver(safeReceiver);
+    setSupplier(safeSupplier);
+    setItems(safeItems);
+    setNotes(data.notes || "상기와 같이 거래명세 내역을 확인드립니다.");
+    setUnpaidAmount(parseNumber(data.unpaidAmount || 0));
+    setReceiverSigner(data.receiverSigner || safeReceiver.managerName || "");
+    setSupplierSigner(data.supplierSigner || safeSupplier.ceoName || "");
+
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function deleteStatement(id: string) {
-    const ok = window.confirm("이 거래명세표를 삭제하시겠습니까?");
+    const ok = window.confirm("이 거래명세서를 삭제하시겠습니까?");
     if (!ok) return;
     syncSavedStatements(savedStatements.filter((item) => item.id !== id));
   }
 
   async function renderStatementCanvas() {
-    if (!previewRef.current) {
-      throw new Error("미리보기 영역을 찾을 수 없습니다.");
-    }
+    if (!previewRef.current) throw new Error("미리보기 영역을 찾을 수 없습니다.");
 
-    const canvas = await html2canvas(previewRef.current, {
+    return await html2canvas(previewRef.current, {
       scale: 2,
       useCORS: true,
       backgroundColor: "#ffffff",
       scrollX: 0,
       scrollY: 0,
     });
-
-    return canvas;
   }
 
   async function handleSavePng() {
@@ -890,12 +1329,8 @@ export default function StatementPage() {
   async function createPdfBlob() {
     const canvas = await renderStatementCanvas();
     const imgData = canvas.toDataURL("image/jpeg", 1.0);
-
     const pdf = new jsPDF("p", "mm", "a4");
-    const pdfWidth = 210;
-    const pdfHeight = 297;
-
-    pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
+    pdf.addImage(imgData, "JPEG", 0, 0, 210, 297);
     return pdf.output("blob");
   }
 
@@ -912,7 +1347,6 @@ export default function StatementPage() {
   async function handlePrint() {
     const blob = await createPdfBlob();
     const url = URL.createObjectURL(blob);
-
     const iframe = document.createElement("iframe");
     iframe.style.position = "fixed";
     iframe.style.right = "0";
@@ -921,7 +1355,6 @@ export default function StatementPage() {
     iframe.style.height = "0";
     iframe.style.border = "0";
     iframe.src = url;
-
     document.body.appendChild(iframe);
 
     iframe.onload = () => {
@@ -941,10 +1374,10 @@ export default function StatementPage() {
 
   function handleSendEmail() {
     const vatLabel = vatMode === "included" ? "VAT 포함" : "VAT 별도";
-    const subject = encodeURIComponent(`[거래명세표] ${statementNumber}`);
+    const subject = encodeURIComponent(`[거래명세서] ${statementNumber}`);
     const body = encodeURIComponent(
       [
-        `거래명세표 번호: ${statementNumber}`,
+        `거래명세서 번호: ${statementNumber}`,
         `작성일: ${statementDate}`,
         `거래처: ${receiver.companyName}`,
         `VAT 구분: ${vatLabel}`,
@@ -953,12 +1386,11 @@ export default function StatementPage() {
         `합계금액: ${formatNumber(totalAmount)}원`,
         `미수금: ${formatNumber(unpaidAmount)}원`,
         "",
-        "원프앤에서 작성된 거래명세표입니다.",
+        "원프앤에서 작성된 거래명세서입니다.",
       ].join("\n")
     );
 
-    const email = receiver.email || "";
-    window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+    window.location.href = `mailto:${receiver.email || ""}?subject=${subject}&body=${body}`;
   }
 
   if (!mounted) {
@@ -972,437 +1404,353 @@ export default function StatementPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f4f6fa] p-6">
-      <div className="mx-auto grid max-w-[1820px] grid-cols-1 gap-4 xl:grid-cols-[680px_1fr]">
-        <div className="space-y-6">
-          <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h1 className="text-2xl font-bold text-gray-900">거래명세표</h1>
-            <p className="mt-2 text-sm text-gray-500">
-              상단 파란 보관용 + 하단 빨간 보관용 2단 출력 버전입니다.
+    <div className="min-h-screen bg-[#f3f5f8] px-4 py-4 xl:px-5 xl:py-5">
+      <div className="mx-auto grid max-w-[2320px] grid-cols-1 gap-5 xl:grid-cols-[920px_minmax(0,1fr)]">
+        <div className="space-y-4">
+          <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-4 shadow-sm">
+            <h1 className="text-[19px] font-bold text-gray-900">거래명세서</h1>
+            <p className="mt-1 text-[12px] text-gray-500">
+              유통단가표처럼 넓은 작업창과 표 기반 품목 입력으로 정리한 실무형 거래명세서입니다.
             </p>
           </div>
 
-          <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">기본 정보</h2>
+          <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-5 shadow-sm">
+            <h2 className="mb-3 text-[16px] font-semibold text-gray-900">기본 정보</h2>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               <label className="block md:col-span-2">
-                <span className="mb-2 block text-sm font-medium text-gray-700">
-                  거래명세표 번호
-                </span>
+                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">거래명세서 번호</span>
                 <input
                   value={statementNumber}
                   onChange={(e) => setStatementNumber(e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
+                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
                 />
               </label>
 
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-gray-700">
-                  작성일
-                </span>
+                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">작성일</span>
                 <input
                   type="date"
                   value={statementDate}
                   onChange={(e) => handleStatementDateChange(e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
+                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
                 />
               </label>
             </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-gray-700">VAT 선택</span>
-                <select
-                  value={vatMode}
-                  onChange={(e) => handleVatModeChange(e.target.value as VatMode)}
-                  className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
-                >
-                  <option value="included">VAT 포함</option>
-                  <option value="separate">VAT 별도</option>
-                </select>
-              </label>
+            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+              <div className="block">
+                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">VAT 선택</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleVatModeChange("included")}
+                    className={`rounded-2xl border px-4 py-2.5 text-[13px] font-semibold transition ${
+                      vatMode === "included"
+                        ? "border-gray-900 bg-gray-900 text-white"
+                        : "border-gray-300 bg-gray-100 text-gray-700"
+                    }`}
+                  >
+                    VAT 포함
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleVatModeChange("separate")}
+                    className={`rounded-2xl border px-4 py-2.5 text-[13px] font-semibold transition ${
+                      vatMode === "separate"
+                        ? "border-gray-900 bg-gray-900 text-white"
+                        : "border-gray-300 bg-gray-100 text-gray-700"
+                    }`}
+                  >
+                    VAT 별도
+                  </button>
+                </div>
+              </div>
 
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-gray-700">인수자</span>
+                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">인수자</span>
                 <input
                   value={receiverSigner}
                   onChange={(e) => setReceiverSigner(e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
+                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
                 />
               </label>
 
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-gray-700">납품자</span>
+                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">납품자</span>
                 <input
                   value={supplierSigner}
                   onChange={(e) => setSupplierSigner(e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
+                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
                 />
               </label>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">공급받는자 정보</h2>
+          <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-5 shadow-sm">
+            <h2 className="mb-3 text-[16px] font-semibold text-gray-900">공급받는자 정보</h2>
 
-            <div className="grid grid-cols-1 gap-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-gray-700">상호(법인명)</span>
+                  <span className="mb-1.5 block text-[12px] font-medium text-gray-700">상호(법인명)</span>
                   <input
                     value={receiver.companyName}
                     onChange={(e) => handleReceiverChange("companyName", e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
+                    className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
                   />
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-gray-700">등록번호</span>
+                  <span className="mb-1.5 block text-[12px] font-medium text-gray-700">등록번호</span>
                   <input
                     value={receiver.businessNumber || ""}
                     onChange={(e) => handleReceiverChange("businessNumber", e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
+                    className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
                   />
                 </label>
               </div>
 
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-gray-700">사업장 주소</span>
+                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">사업장 주소</span>
                 <input
                   value={receiver.address || ""}
                   onChange={(e) => handleReceiverChange("address", e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
+                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
                 />
               </label>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-gray-700">성명</span>
+                  <span className="mb-1.5 block text-[12px] font-medium text-gray-700">성명</span>
                   <input
                     value={receiver.managerName}
                     onChange={(e) => {
                       handleReceiverChange("managerName", e.target.value);
                       if (!receiverSigner) setReceiverSigner(e.target.value);
                     }}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
+                    className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
                   />
                 </label>
 
                 <label className="block md:col-span-2">
-                  <span className="mb-2 block text-sm font-medium text-gray-700">전화번호</span>
+                  <span className="mb-1.5 block text-[12px] font-medium text-gray-700">전화번호</span>
                   <input
                     value={receiver.phone}
                     onChange={(e) => handleReceiverChange("phone", e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
+                    className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
                   />
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-gray-700">팩스</span>
+                  <span className="mb-1.5 block text-[12px] font-medium text-gray-700">팩스</span>
                   <input
                     value={receiver.fax || ""}
                     onChange={(e) => handleReceiverChange("fax", e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
+                    className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
                   />
                 </label>
               </div>
 
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-gray-700">이메일</span>
+                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">이메일</span>
                 <input
                   value={receiver.email}
                   onChange={(e) => handleReceiverChange("email", e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
+                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
                 />
               </label>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">공급자 정보</h2>
+          <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-5 shadow-sm">
+            <h2 className="mb-3 text-[16px] font-semibold text-gray-900">공급자 정보</h2>
 
-            <div className="grid grid-cols-1 gap-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-gray-700">상호(법인명)</span>
+                  <span className="mb-1.5 block text-[12px] font-medium text-gray-700">상호(법인명)</span>
                   <input
                     value={supplier.companyName}
                     onChange={(e) => handleSupplierChange("companyName", e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
+                    className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
                   />
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-gray-700">등록번호</span>
+                  <span className="mb-1.5 block text-[12px] font-medium text-gray-700">등록번호</span>
                   <input
                     value={supplier.businessNumber}
                     onChange={(e) => handleSupplierChange("businessNumber", e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
+                    className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
                   />
                 </label>
               </div>
 
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-gray-700">사업장 주소</span>
+                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">사업장 주소</span>
                 <input
                   value={supplier.address}
                   onChange={(e) => handleSupplierChange("address", e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
+                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
                 />
               </label>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-gray-700">대표자</span>
+                  <span className="mb-1.5 block text-[12px] font-medium text-gray-700">대표자</span>
                   <input
                     value={supplier.ceoName}
                     onChange={(e) => {
                       handleSupplierChange("ceoName", e.target.value);
                       if (!supplierSigner) setSupplierSigner(e.target.value);
                     }}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
+                    className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
                   />
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-gray-700">전화번호</span>
+                  <span className="mb-1.5 block text-[12px] font-medium text-gray-700">전화번호</span>
                   <input
                     value={supplier.phone}
                     onChange={(e) => handleSupplierChange("phone", e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
+                    className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
                   />
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-gray-700">팩스</span>
+                  <span className="mb-1.5 block text-[12px] font-medium text-gray-700">팩스</span>
                   <input
                     value={supplier.fax}
                     onChange={(e) => handleSupplierChange("fax", e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
+                    className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
                   />
                 </label>
               </div>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">품목 정보</h2>
-              <button
-                onClick={addItem}
-                className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white"
-              >
-                품목 추가
-              </button>
-            </div>
+          <ItemTable
+            items={items}
+            vatMode={vatMode}
+            onChange={handleItemChange}
+            onRemove={removeItem}
+            onAdd={addItem}
+            registerInput={registerInput}
+            onCellEnter={handleCellEnter}
+          />
 
-            <div className="space-y-4">
-              {normalizedItems.map((item, index) => (
-                <div key={item.id} className="rounded-2xl border border-gray-200 p-4">
-                  <div className="mb-3 flex items-center justify-between">
-                    <p className="text-sm font-semibold text-gray-800">품목 {index + 1}</p>
-                    <button
-                      onClick={() => removeItem(item.id)}
-                      className="text-sm font-medium text-red-500"
-                    >
-                      삭제
-                    </button>
-                  </div>
+          <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-5 shadow-sm">
+            <h2 className="mb-3 text-[16px] font-semibold text-gray-900">정리 정보</h2>
 
-                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-[52px_52px_52px_1.4fr_0.9fr_0.7fr_0.8fr_1fr_1fr_1fr]">
-                    <input
-                      placeholder="년"
-                      value={item.dateYear}
-                      onChange={(e) => handleItemChange(item.id, "dateYear", e.target.value)}
-                      className="rounded-xl border border-gray-300 px-3 py-3 text-center outline-none focus:border-gray-900"
-                    />
-                    <input
-                      placeholder="월"
-                      value={item.dateMonth}
-                      onChange={(e) => handleItemChange(item.id, "dateMonth", e.target.value)}
-                      className="rounded-xl border border-gray-300 px-3 py-3 text-center outline-none focus:border-gray-900"
-                    />
-                    <input
-                      placeholder="일"
-                      value={item.dateDay}
-                      onChange={(e) => handleItemChange(item.id, "dateDay", e.target.value)}
-                      className="rounded-xl border border-gray-300 px-3 py-3 text-center outline-none focus:border-gray-900"
-                    />
-                    <input
-                      placeholder="품목"
-                      value={item.productName}
-                      onChange={(e) => handleItemChange(item.id, "productName", e.target.value)}
-                      className="rounded-xl border border-gray-300 px-3 py-3 outline-none focus:border-gray-900 md:col-span-2"
-                    />
-                    <input
-                      placeholder="규격"
-                      value={item.spec}
-                      onChange={(e) => handleItemChange(item.id, "spec", e.target.value)}
-                      className="rounded-xl border border-gray-300 px-3 py-3 outline-none focus:border-gray-900"
-                    />
-                    <input
-                      placeholder="단위"
-                      value={item.unit}
-                      onChange={(e) => handleItemChange(item.id, "unit", e.target.value)}
-                      className="rounded-xl border border-gray-300 px-3 py-3 text-center outline-none focus:border-gray-900"
-                    />
-                    <input
-                      type="number"
-                      placeholder="수량"
-                      value={item.quantity}
-                      onChange={(e) => handleItemChange(item.id, "quantity", Number(e.target.value || 0))}
-                      className="rounded-xl border border-gray-300 px-3 py-3 text-right outline-none focus:border-gray-900"
-                    />
-                    <input
-                      type="number"
-                      placeholder={vatMode === "included" ? "단가(VAT포함)" : "단가(VAT별도)"}
-                      value={item.unitPrice}
-                      onChange={(e) => handleItemChange(item.id, "unitPrice", Number(e.target.value || 0))}
-                      className="rounded-xl border border-gray-300 px-3 py-3 text-right outline-none focus:border-gray-900"
-                    />
-                    <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-right text-sm font-medium text-gray-700">
-                      공급가액 {formatNumber(item.supplyAmount)}
-                    </div>
-                    <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-right text-sm font-medium text-gray-700">
-                      세액 {formatNumber(item.taxAmount)}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">정리 정보</h2>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-gray-700">미수금</span>
+                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">미수금</span>
                 <input
                   type="number"
-                  value={unpaidAmount}
+                  value={unpaidAmount === 0 ? "" : unpaidAmount}
+                  onFocus={(e) => {
+                    if (unpaidAmount === 0) e.target.value = "";
+                  }}
+                  onBlur={(e) => {
+                    if (e.target.value === "") {
+                      setUnpaidAmount(0);
+                    }
+                  }}
                   onChange={(e) => setUnpaidAmount(Number(e.target.value || 0))}
-                  className="w-full rounded-xl border border-gray-300 px-4 py-3 text-right outline-none focus:border-gray-900"
+                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-right text-[14px] outline-none focus:border-gray-900"
                 />
               </label>
 
-              <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                <div className="flex items-center justify-between py-1 text-sm">
+              <div className="rounded-[22px] border border-gray-200 bg-gray-50 p-4">
+                <div className="flex items-center justify-between py-1 text-[13px]">
                   <span className="text-gray-500">공급가액</span>
-                  <span className="font-semibold text-gray-900">{formatNumber(totalSupplyAmount)}원</span>
+                  <span className="text-gray-900">{formatNumber(totalSupplyAmount)}원</span>
                 </div>
-                <div className="flex items-center justify-between py-1 text-sm">
+                <div className="flex items-center justify-between py-1 text-[13px]">
                   <span className="text-gray-500">세액</span>
-                  <span className="font-semibold text-gray-900">{formatNumber(totalTaxAmount)}원</span>
+                  <span className="text-gray-900">{formatNumber(totalTaxAmount)}원</span>
                 </div>
                 <div className="mt-2 flex items-center justify-between border-t border-gray-200 pt-3">
-                  <span className="font-semibold text-gray-800">
+                  <span className="text-gray-800">
                     {vatMode === "included" ? "합계금액(VAT 포함)" : "합계금액(VAT 별도)"}
                   </span>
-                  <span className="text-lg font-bold text-gray-900">{formatNumber(totalAmount)}원</span>
+                  <span className="text-[20px] text-gray-900">{formatNumber(totalAmount)}원</span>
                 </div>
               </div>
             </div>
 
-            <label className="mt-4 block">
-              <span className="mb-2 block text-sm font-medium text-gray-700">비고</span>
+            <label className="mt-3 block">
+              <span className="mb-1.5 block text-[12px] font-medium text-gray-700">비고</span>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
-                className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-gray-900"
+                className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-[14px] outline-none focus:border-gray-900"
               />
             </label>
           </div>
 
-          <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">저장 / 출력</h2>
+          <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-5 shadow-sm">
+            <h2 className="mb-3 text-[16px] font-semibold text-gray-900">저장 / 출력</h2>
 
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-              <button
-                onClick={saveStatement}
-                className="rounded-xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white"
-              >
-                거래명세표 저장
+              <button onClick={saveStatement} className="rounded-2xl bg-gray-900 px-4 py-2.5 text-[13px] font-semibold text-white">
+                거래명세서 저장
               </button>
-
-              <button
-                onClick={handleSavePng}
-                className="rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-900"
-              >
+              <button onClick={handleSavePng} className="rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-semibold text-gray-900">
                 PNG 저장
               </button>
-
-              <button
-                onClick={handleSaveJpg}
-                className="rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-900"
-              >
+              <button onClick={handleSaveJpg} className="rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-semibold text-gray-900">
                 JPG 저장
               </button>
-
-              <button
-                onClick={handleSavePdf}
-                className="rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-900"
-              >
+              <button onClick={handleSavePdf} className="rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-semibold text-gray-900">
                 PDF 저장
               </button>
-
-              <button
-                onClick={handlePrint}
-                className="rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-900"
-              >
+              <button onClick={handlePrint} className="rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-semibold text-gray-900">
                 인쇄
               </button>
-
-              <button
-                onClick={handleSendEmail}
-                className="rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-900"
-              >
+              <button onClick={handleSendEmail} className="rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-semibold text-gray-900">
                 이메일 발송
               </button>
             </div>
 
             <button
               onClick={resetForm}
-              className="mt-4 w-full rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600"
+              className="mt-3 w-full rounded-2xl bg-red-50 px-4 py-2.5 text-[13px] font-semibold text-red-600"
             >
-              새 거래명세표 작성
+              새 거래명세서 작성
             </button>
           </div>
 
-          <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">저장된 거래명세표</h2>
+          <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-5 shadow-sm">
+            <h2 className="mb-3 text-[16px] font-semibold text-gray-900">저장된 거래명세서</h2>
 
             <div className="space-y-3">
               {savedStatements.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-gray-300 p-6 text-sm text-gray-500">
-                  저장된 거래명세표가 없습니다.
+                <div className="rounded-[22px] border border-dashed border-gray-300 p-6 text-[13px] text-gray-500">
+                  저장된 거래명세서가 없습니다.
                 </div>
               ) : (
                 savedStatements.map((item) => (
-                  <div key={item.id} className="rounded-2xl border border-gray-200 p-4">
+                  <div key={item.id} className="rounded-[22px] border border-gray-200 p-4">
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <div>
                         <p className="font-semibold text-gray-900">{item.statementNumber}</p>
-                        <p className="mt-1 text-sm text-gray-500">
-                          거래처: {item.receiver.companyName || "-"}
-                        </p>
-                        <p className="mt-1 text-sm text-gray-500">
-                          합계금액: {formatNumber(item.totalAmount)}원
-                        </p>
+                        <p className="mt-1 text-[13px] text-gray-500">거래처: {item.receiver.companyName || "-"}</p>
+                        <p className="mt-1 text-[13px] text-gray-500">합계금액: {formatNumber(item.totalAmount)}원</p>
                       </div>
 
                       <div className="flex gap-2">
                         <button
                           onClick={() => loadStatement(item)}
-                          className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white"
+                          className="rounded-2xl bg-gray-900 px-4 py-2 text-[13px] font-medium text-white"
                         >
                           불러오기
                         </button>
                         <button
                           onClick={() => deleteStatement(item.id)}
-                          className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-600"
+                          className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-[13px] font-medium text-red-600"
                         >
                           삭제
                         </button>
@@ -1415,33 +1763,38 @@ export default function StatementPage() {
           </div>
         </div>
 
-        <div className="xl:sticky xl:top-6 xl:self-start">
-          <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between px-2">
-              <h2 className="text-lg font-semibold text-gray-900">A4 미리보기</h2>
-              <p className="text-xs text-gray-500">파란 보관용 + 빨간 보관용</p>
+        <div className="xl:sticky xl:top-5 xl:self-start">
+          <div className="rounded-[28px] border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between px-1">
+              <h2 className="text-[18px] font-semibold text-gray-900">A4 미리보기</h2>
+              <p className="text-[11px] text-gray-500">파란 보관용 + 빨간 보관용</p>
             </div>
 
-            <div className="overflow-auto rounded-2xl bg-[#eef2f7] p-3">
+            <div className="overflow-auto rounded-[22px] bg-[#edf1f6] p-3">
               <div
                 ref={previewRef}
                 className="mx-auto w-[980px] bg-white p-3 text-black"
-                style={{ fontFamily: "Arial, 'Malgun Gothic', sans-serif" }}
+                style={{
+                  fontFamily: "Arial, 'Malgun Gothic', sans-serif",
+                  transform: "scale(0.99)",
+                  transformOrigin: "top center",
+                  marginBottom: "-20px",
+                }}
               >
                 <SlipPreview
                   color="#355cff"
                   titleNote="공급받는자 보관용"
-                  receiver={receiver}
-                  supplier={supplier}
-                  previewRows={previewRows}
-                  vatMode={vatMode}
-                  totalSupplyAmount={totalSupplyAmount}
-                  totalTaxAmount={totalTaxAmount}
-                  totalAmount={totalAmount}
-                  unpaidAmount={unpaidAmount}
-                  receiverSigner={receiverSigner}
-                  supplierSigner={supplierSigner}
-                  companySettings={companySettings}
+                  receiver={deferredReceiver}
+                  supplier={deferredSupplier}
+                  previewRows={deferredPreviewRows}
+                  vatMode={deferredVatMode}
+                  totalSupplyAmount={deferredTotalSupplyAmount}
+                  totalTaxAmount={deferredTotalTaxAmount}
+                  totalAmount={deferredTotalAmount}
+                  unpaidAmount={deferredUnpaidAmount}
+                  receiverSigner={deferredReceiverSigner}
+                  supplierSigner={deferredSupplierSigner}
+                  companySettings={deferredCompanySettings}
                 />
 
                 <div className="h-[12px]" />
@@ -1449,24 +1802,24 @@ export default function StatementPage() {
                 <SlipPreview
                   color="#ff4b4b"
                   titleNote="공급자 보관용"
-                  receiver={receiver}
-                  supplier={supplier}
-                  previewRows={previewRows}
-                  vatMode={vatMode}
-                  totalSupplyAmount={totalSupplyAmount}
-                  totalTaxAmount={totalTaxAmount}
-                  totalAmount={totalAmount}
-                  unpaidAmount={unpaidAmount}
-                  receiverSigner={receiverSigner}
-                  supplierSigner={supplierSigner}
-                  companySettings={companySettings}
+                  receiver={deferredReceiver}
+                  supplier={deferredSupplier}
+                  previewRows={deferredPreviewRows}
+                  vatMode={deferredVatMode}
+                  totalSupplyAmount={deferredTotalSupplyAmount}
+                  totalTaxAmount={deferredTotalTaxAmount}
+                  totalAmount={deferredTotalAmount}
+                  unpaidAmount={deferredUnpaidAmount}
+                  receiverSigner={deferredReceiverSigner}
+                  supplierSigner={deferredSupplierSigner}
+                  companySettings={deferredCompanySettings}
                 />
 
-                <div className="mt-2 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-[10px] leading-4 text-gray-600">
-                  <div>비고: {notes}</div>
-                  <div>거래명세표 번호: {statementNumber}</div>
-                  <div>작성일: {statementDate}</div>
-                  <div>VAT 구분: {vatMode === "included" ? "포함" : "별도"}</div>
+                <div className="mt-2 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-[12px] leading-5 text-gray-600">
+                  <div>비고: {deferredNotes}</div>
+                  <div>거래명세서 번호: {deferredStatementNumber}</div>
+                  <div>작성일: {deferredStatementDate}</div>
+                  <div>VAT 구분: {deferredVatMode === "included" ? "포함" : "별도"}</div>
                 </div>
               </div>
             </div>
