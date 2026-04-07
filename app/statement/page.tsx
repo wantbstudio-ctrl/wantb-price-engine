@@ -13,6 +13,7 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
 type VatMode = "included" | "separate";
+
 type EditableField =
   | "dateYear"
   | "dateMonth"
@@ -64,14 +65,14 @@ type ClientRecord = {
 
 type CompanySettings = {
   companyName?: string;
-  ceoName?: string;
+  ceo?: string;
   businessNumber?: string;
   address?: string;
   phone?: string;
   email?: string;
   fax?: string;
-  logoDataUrl?: string;
-  stampDataUrl?: string;
+  logo?: string;
+  stamp?: string;
 };
 
 type SupplierData = {
@@ -116,6 +117,80 @@ type EstimateDraft = {
   items?: EstimateDraftProduct[];
 };
 
+type PreviewSpread = {
+  topRows: StatementItem[];
+  bottomRows: StatementItem[];
+};
+
+type StatementPagePreviewProps = {
+  pageIndex: number;
+  pageRows: PreviewSpread;
+  receiver: ClientData;
+  supplier: SupplierData;
+  vatMode: VatMode;
+  totalAmount: number;
+  unpaidAmount: number;
+  receiverSigner: string;
+  supplierSigner: string;
+  notes: string;
+  companySettings: CompanySettings;
+  setPageRef: (index: number, el: HTMLDivElement | null) => void;
+};
+
+type ItemRowProps = {
+  item: StatementItem;
+  index: number;
+  vatMode: VatMode;
+  isSelected: boolean;
+  onToggleSelect: (id: string) => void;
+  onChange: (
+    id: string,
+    key: keyof StatementItem,
+    value: string | number
+  ) => void;
+  onRemove: (id: string) => void;
+  onDuplicate: (id: string) => void;
+  registerInput: (
+    itemId: string,
+    field: EditableField,
+    el: HTMLInputElement | null
+  ) => void;
+  onCellNavigate: (
+    rowIndex: number,
+    field: EditableField,
+    action: "enter" | "up" | "down" | "left" | "right" | "tab" | "shiftTab"
+  ) => void;
+};
+
+type ItemTableProps = {
+  items: StatementItem[];
+  selectedRowIds: string[];
+  vatMode: VatMode;
+  onToggleSelect: (id: string) => void;
+  onSelectAll: () => void;
+  onClearSelection: () => void;
+  onDeleteSelected: () => void;
+  onDuplicateSelected: () => void;
+  onChange: (
+    id: string,
+    key: keyof StatementItem,
+    value: string | number
+  ) => void;
+  onRemove: (id: string) => void;
+  onDuplicate: (id: string) => void;
+  registerInput: (
+    itemId: string,
+    field: EditableField,
+    el: HTMLInputElement | null
+  ) => void;
+  onCellNavigate: (
+    rowIndex: number,
+    field: EditableField,
+    action: "enter" | "up" | "down" | "left" | "right" | "tab" | "shiftTab"
+  ) => void;
+  onPasteRows: (text: string) => void;
+};
+
 const STORAGE_KEYS = {
   statements: "wantb-statements",
   statementSeq: "wantb-statement-seq",
@@ -125,9 +200,9 @@ const STORAGE_KEYS = {
   estimateDraft: "estimate-draft",
 };
 
-const PREVIEW_ROW_COUNT = 7;
-const EXPORT_PAGE_WIDTH = 794;
-const EXPORT_PAGE_HEIGHT = 1123;
+const HALF_PREVIEW_ROW_COUNT = 12;
+const EXPORT_PAGE_WIDTH = 1000;
+const EXPORT_PAGE_HEIGHT = 1414;
 
 const EDITABLE_FIELDS: EditableField[] = [
   "dateYear",
@@ -141,13 +216,17 @@ const EDITABLE_FIELDS: EditableField[] = [
   "supplyAmount",
 ];
 
+const previewColWidths = [40, 40, 40, 220, 100, 60, 60, 100, 120, 120];
+
 function formatNumber(value: number) {
   if (!Number.isFinite(value)) return "0";
   return value.toLocaleString("ko-KR");
 }
 
 function parseNumber(value: string | number) {
-  const num = Number(value);
+  const normalized =
+    typeof value === "string" ? value.replace(/,/g, "").trim() : value;
+  const num = Number(normalized);
   return Number.isFinite(num) ? num : 0;
 }
 
@@ -221,7 +300,7 @@ function calcFromSupplyAmount(
     };
   }
 
-  const unitPrice = Math.round(safeSupply / safeQty);
+  const unitPrice = safeQty > 0 ? Math.round(safeSupply / safeQty) : 0;
 
   return {
     quantity: safeQty,
@@ -236,13 +315,29 @@ function makeItem(date = todayString()): StatementItem {
 
   return {
     id: crypto.randomUUID(),
-    dateYear: year,
-    dateMonth: month,
-    dateDay: day,
+    dateYear: year.slice(-2),
+    dateMonth: String(Number(month) || ""),
+    dateDay: String(Number(day) || ""),
     productName: "",
     spec: "",
-    unit: "EA",
+    unit: "ea",
     quantity: 1,
+    unitPrice: 0,
+    supplyAmount: 0,
+    taxAmount: 0,
+  };
+}
+
+function makeEmptyPreviewRow(): StatementItem {
+  return {
+    id: crypto.randomUUID(),
+    dateYear: "",
+    dateMonth: "",
+    dateDay: "",
+    productName: "",
+    spec: "",
+    unit: "",
+    quantity: 0,
     unitPrice: 0,
     supplyAmount: 0,
     taxAmount: 0,
@@ -268,51 +363,17 @@ function sanitizeLoadedItem(
 
   return {
     id: item.id || crypto.randomUUID(),
-    dateYear: item.dateYear || year,
-    dateMonth: item.dateMonth || month,
-    dateDay: item.dateDay || day,
+    dateYear: item.dateYear || year.slice(-2),
+    dateMonth: item.dateMonth || String(Number(month) || ""),
+    dateDay: item.dateDay || String(Number(day) || ""),
     productName: item.productName || "",
     spec: item.spec || "",
-    unit: item.unit || "EA",
+    unit: item.unit || "ea",
     quantity: normalized.quantity,
     unitPrice: normalized.unitPrice,
     supplyAmount: normalized.supplyAmount,
     taxAmount: normalized.taxAmount,
   };
-}
-
-function makePreviewRows(items: StatementItem[]) {
-  const rows = [...items];
-  while (rows.length < PREVIEW_ROW_COUNT) {
-    rows.push({
-      id: crypto.randomUUID(),
-      dateYear: "",
-      dateMonth: "",
-      dateDay: "",
-      productName: "",
-      spec: "",
-      unit: "",
-      quantity: 0,
-      unitPrice: 0,
-      supplyAmount: 0,
-      taxAmount: 0,
-    });
-  }
-  return rows.slice(0, PREVIEW_ROW_COUNT);
-}
-
-function chunkPreviewRows(items: StatementItem[]) {
-  const pages: StatementItem[][] = [];
-
-  for (let i = 0; i < items.length; i += PREVIEW_ROW_COUNT) {
-    pages.push(items.slice(i, i + PREVIEW_ROW_COUNT));
-  }
-
-  if (pages.length === 0) {
-    pages.push([]);
-  }
-
-  return pages.map((page) => makePreviewRows(page));
 }
 
 function parsePastedNumber(value?: string) {
@@ -330,6 +391,7 @@ function isEffectivelyEmptyItem(item: StatementItem) {
   return (
     !item.productName &&
     !item.spec &&
+    !item.unit &&
     item.quantity === 1 &&
     item.unitPrice === 0 &&
     item.supplyAmount === 0 &&
@@ -357,7 +419,7 @@ function parsePastedStatementRows(
       dateDay = "",
       productName = "",
       spec = "",
-      unit = "EA",
+      unit = "ea",
       quantityRaw = "1",
       unitPriceRaw = "0",
       supplyAmountRaw = "0",
@@ -380,7 +442,7 @@ function parsePastedStatementRows(
         dateDay: dateDay.trim(),
         productName: productName.trim(),
         spec: spec.trim(),
-        unit: (unit || "EA").trim(),
+        unit: (unit || "ea").trim(),
         quantity: normalized.quantity,
         unitPrice: normalized.unitPrice,
         supplyAmount: normalized.supplyAmount,
@@ -391,26 +453,38 @@ function parsePastedStatementRows(
   });
 }
 
-function canMoveLeftRightCell(
-  e: React.KeyboardEvent<HTMLInputElement>,
-  direction: "left" | "right"
-) {
-  const input = e.currentTarget;
-  const value = input.value ?? "";
-  const isNumberInput = input.type === "number";
+function padHalfRows(rows: StatementItem[]) {
+  const next = [...rows];
+  while (next.length < HALF_PREVIEW_ROW_COUNT) {
+    next.push(makeEmptyPreviewRow());
+  }
+  return next;
+}
 
-  if (isNumberInput) {
-    return true;
+function chunkPreviewRows(items: StatementItem[]): PreviewSpread[] {
+  const source = items.length > 0 ? items : [makeItem(todayString())];
+  const spreads: PreviewSpread[] = [];
+  const unit = HALF_PREVIEW_ROW_COUNT;
+
+  for (let i = 0; i < source.length; i += unit) {
+    const pageRows = source.slice(i, i + HALF_PREVIEW_ROW_COUNT);
+    const paddedRows = padHalfRows(pageRows);
+
+    spreads.push({
+      topRows: paddedRows,
+      bottomRows: [...paddedRows],
+    });
   }
 
-  const selectionStart = input.selectionStart ?? 0;
-  const selectionEnd = input.selectionEnd ?? 0;
-
-  if (direction === "left") {
-    return selectionStart === 0 && selectionEnd === 0;
+  if (spreads.length === 0) {
+    const emptyRows = padHalfRows([]);
+    spreads.push({
+      topRows: emptyRows,
+      bottomRows: [...emptyRows],
+    });
   }
 
-  return selectionStart === value.length && selectionEnd === value.length;
+  return spreads;
 }
 
 function toReceiverFromClient(client: ClientRecord): ClientData {
@@ -427,1587 +501,1002 @@ function toReceiverFromClient(client: ClientRecord): ClientData {
   };
 }
 
-type LabelValueRowProps = {
-  color: string;
-  label: string;
-  value?: string;
-  last?: boolean;
-};
+function getCellMoveAllowed(
+  e: React.KeyboardEvent<HTMLInputElement>,
+  direction: "left" | "right"
+) {
+  const input = e.currentTarget;
+  const selectionStart = input.selectionStart ?? 0;
+  const selectionEnd = input.selectionEnd ?? 0;
+  const length = input.value.length;
 
+  if (input.type === "number") return true;
 
-type PdfCellProps = {
-  children?: React.ReactNode;
-  width?: number | string;
-  height?: number;
-  align?: "left" | "center" | "right";
-  verticalAlign?: "top" | "middle" | "bottom";
-  fontSize?: number;
-  fontWeight?: number | string;
-  color?: string;
-  whiteSpace?: "normal" | "nowrap" | "pre-line";
-  padding?: string;
-  borderTop?: string;
-  borderRight?: string;
-  borderBottom?: string;
-  borderLeft?: string;
-  letterSpacing?: number;
-  lineHeight?: string | number;
-};
+  if (direction === "left") {
+    return selectionStart === 0 && selectionEnd === 0;
+  }
 
-type PdfLabelValueRow = {
-  label: string;
-  value?: string;
-  rowHeight?: number;
-  valueWhiteSpace?: "normal" | "nowrap" | "pre-line";
-  labelWhiteSpace?: "normal" | "nowrap" | "pre-line";
-  valueFontSize?: number;
-};
+  return selectionStart === length && selectionEnd === length;
+}
 
-function PdfLabelValueTable({
-  color,
+function StatementHalfDocument({
   rows,
-  labelWidth,
-  borderLeft,
-  borderRight,
-}: {
-  color: string;
-  rows: PdfLabelValueRow[];
-  labelWidth: number;
-  borderLeft?: string;
-  borderRight?: string;
-}) {
-  return (
-    <table
-      style={{
-        width: "100%",
-        tableLayout: "fixed",
-        borderCollapse: "collapse",
-        borderLeft,
-        borderRight,
-      }}
-    >
-      <colgroup>
-        <col style={{ width: `${labelWidth}px` }} />
-        <col />
-      </colgroup>
-      <tbody>
-        {rows.map((row, index) => {
-          const isLast = index === rows.length - 1;
-          const borderBottom = isLast ? undefined : `1px solid ${color}`;
-
-          return (
-            <tr key={`${row.label}-${index}`}>
-              <PdfCell
-                height={row.rowHeight ?? 38}
-                align="center"
-                fontSize={12}
-                fontWeight={700}
-                color={color}
-                whiteSpace={row.labelWhiteSpace ?? "pre-line"}
-                padding="0 6px"
-                borderRight={`1px solid ${color}`}
-                borderBottom={borderBottom}
-                lineHeight={1.15}
-              >
-                {row.label}
-              </PdfCell>
-              <PdfCell
-                height={row.rowHeight ?? 38}
-                fontSize={row.valueFontSize ?? 12}
-                whiteSpace={row.valueWhiteSpace ?? "nowrap"}
-                padding="0 10px"
-                borderBottom={borderBottom}
-              >
-                {row.value || ""}
-              </PdfCell>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
-  );
-}
-
-function PdfSupplierInfoTable({
   color,
-  supplier,
-  vatMode,
-  companySettings,
-}: {
-  color: string;
-  supplier: SupplierData;
-  vatMode: VatMode;
-  companySettings: CompanySettings;
-}) {
-  return (
-    <div style={{ position: "relative", width: "100%", height: "100%" }}>
-      <table
-        style={{
-          width: "100%",
-          tableLayout: "fixed",
-          borderCollapse: "collapse",
-        }}
-      >
-        <colgroup>
-          <col style={{ width: "108px" }} />
-          <col style={{ width: "170px" }} />
-          <col style={{ width: "56px" }} />
-          <col />
-        </colgroup>
-        <tbody>
-          <tr>
-            <PdfCell
-              height={38}
-              align="center"
-              fontSize={12}
-              fontWeight={700}
-              color={color}
-              whiteSpace="pre-line"
-              padding="0 6px"
-              borderRight={`1px solid ${color}`}
-              borderBottom={`1px solid ${color}`}
-              lineHeight={1.15}
-            >
-              등록번호
-            </PdfCell>
-            <PdfCell
-              height={38}
-              fontSize={12}
-              whiteSpace="nowrap"
-              padding="0 10px"
-              borderBottom={`1px solid ${color}`}
-              borderRight={`1px solid ${color}`}
-            >
-              {supplier.businessNumber || ""}
-            </PdfCell>
-            <PdfCell
-              height={38}
-              align="center"
-              fontSize={12}
-              fontWeight={700}
-              color={color}
-              borderRight={`1px solid ${color}`}
-              borderBottom={`1px solid ${color}`}
-            >
-              성명
-            </PdfCell>
-            <PdfCell
-              height={38}
-              fontSize={12}
-              whiteSpace="nowrap"
-              padding="0 10px"
-              borderBottom={`1px solid ${color}`}
-            >
-              {supplier.ceoName || ""}
-            </PdfCell>
-          </tr>
-
-          <tr>
-            <PdfCell
-              height={38}
-              align="center"
-              fontSize={12}
-              fontWeight={700}
-              color={color}
-              whiteSpace="pre-line"
-              padding="0 6px"
-              borderRight={`1px solid ${color}`}
-              borderBottom={`1px solid ${color}`}
-              lineHeight={1.15}
-            >
-              상 호{"\n"}(법인명)
-            </PdfCell>
-            <PdfCell
-              height={38}
-              fontSize={12}
-              whiteSpace="nowrap"
-              padding="0 10px"
-              borderRight={`1px solid ${color}`}
-              borderBottom={`1px solid ${color}`}
-            >
-              {supplier.companyName || ""}
-            </PdfCell>
-            <PdfCell
-              height={38}
-              align="center"
-              fontSize={12}
-              fontWeight={700}
-              color={color}
-              borderRight={`1px solid ${color}`}
-              borderBottom={`1px solid ${color}`}
-            >
-              전화
-            </PdfCell>
-            <PdfCell
-              height={38}
-              fontSize={12}
-              whiteSpace="nowrap"
-              padding="0 10px"
-              borderBottom={`1px solid ${color}`}
-            >
-              {supplier.phone || ""}
-            </PdfCell>
-          </tr>
-
-          <tr>
-            <PdfCell
-              height={50}
-              align="center"
-              fontSize={12}
-              fontWeight={700}
-              color={color}
-              whiteSpace="pre-line"
-              padding="0 6px"
-              borderRight={`1px solid ${color}`}
-              borderBottom={`1px solid ${color}`}
-              lineHeight={1.15}
-            >
-              사업장{"\n"}주소
-            </PdfCell>
-            <PdfCell
-              height={50}
-              fontSize={11}
-              whiteSpace="normal"
-              padding="6px 10px"
-              borderRight={`1px solid ${color}`}
-              borderBottom={`1px solid ${color}`}
-              verticalAlign="top"
-              lineHeight={1.3}
-            >
-              {supplier.address || ""}
-            </PdfCell>
-            <PdfCell
-              height={50}
-              align="center"
-              fontSize={12}
-              fontWeight={700}
-              color={color}
-              borderRight={`1px solid ${color}`}
-              borderBottom={`1px solid ${color}`}
-            >
-              팩스
-            </PdfCell>
-            <PdfCell
-              height={50}
-              fontSize={12}
-              whiteSpace="nowrap"
-              padding="0 10px"
-              borderBottom={`1px solid ${color}`}
-            >
-              {supplier.fax || ""}
-            </PdfCell>
-          </tr>
-
-          <tr>
-            <PdfCell
-              height={34}
-              align="center"
-              fontSize={12}
-              fontWeight={700}
-              color={color}
-              borderRight={`1px solid ${color}`}
-            >
-              VAT
-            </PdfCell>
-            <PdfCell
-              height={34}
-              fontSize={12}
-              whiteSpace="nowrap"
-              padding="0 10px"
-              borderRight={`1px solid ${color}`}
-            >
-              {vatMode === "included" ? "포함" : "별도"}
-            </PdfCell>
-            <PdfCell
-              height={34}
-              align="center"
-              fontSize={12}
-              fontWeight={700}
-              color={color}
-              borderRight={`1px solid ${color}`}
-            >
-              비고
-            </PdfCell>
-            <PdfCell
-              height={34}
-              fontSize={12}
-              whiteSpace="nowrap"
-              padding="0 10px"
-            >
-              -
-            </PdfCell>
-          </tr>
-        </tbody>
-      </table>
-
-      {companySettings.stampDataUrl ? (
-        <img
-          src={companySettings.stampDataUrl}
-          alt="stamp"
-          style={{
-            position: "absolute",
-            right: "14px",
-            top: "48px",
-            width: "48px",
-            height: "48px",
-            objectFit: "contain",
-            opacity: 0.9,
-          }}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-type SlipPreviewProps = {
-  color: string;
-  titleNote: string;
-  receiver: ClientData;
-  supplier: SupplierData;
-  previewRows: StatementItem[];
-  vatMode: VatMode;
-  totalSupplyAmount: number;
-  totalTaxAmount: number;
-  totalAmount: number;
-  unpaidAmount: number;
-  receiverSigner: string;
-  supplierSigner: string;
-  companySettings: CompanySettings;
-};
-
-type PdfCellProps = {
-  children?: React.ReactNode;
-  width?: number | string;
-  height?: number;
-  align?: "left" | "center" | "right";
-  vAlign?: "top" | "middle" | "bottom";
-  fontSize?: number;
-  fontWeight?: number;
-  color?: string;
-  whiteSpace?: "normal" | "nowrap" | "pre-line";
-  padding?: string;
-  borderTop?: string;
-  borderRight?: string;
-  borderBottom?: string;
-  borderLeft?: string;
-  lineHeight?: number;
-  letterSpacing?: number;
-};
-
-function PdfCell({
-  children,
-  width,
-  height,
-  align = "left",
-  vAlign = "middle",
-  fontSize = 12,
-  fontWeight,
-  color: textColor = "#222",
-  whiteSpace = "normal",
-  padding = "0 8px",
-  borderTop,
-  borderRight,
-  borderBottom,
-  borderLeft,
-  lineHeight = 1.2,
-  letterSpacing,
-}: PdfCellProps) {
-  return (
-    <td
-      style={{
-        width,
-        height,
-        textAlign: align,
-        verticalAlign: vAlign,
-        fontSize: `${fontSize}px`,
-        fontWeight,
-        color: textColor,
-        whiteSpace,
-        padding,
-        borderTop,
-        borderRight,
-        borderBottom,
-        borderLeft,
-        lineHeight,
-        letterSpacing:
-          typeof letterSpacing === "number"
-            ? `${letterSpacing}px`
-            : undefined,
-        overflow: "hidden",
-        boxSizing: "border-box",
-      }}
-    >
-      {children}
-    </td>
-  );
-}
-
-function renderPdfAmount(value: number) {
-  return value ? formatNumber(value) : "";
-}
-
-function renderPdfYear(value: string) {
-  return value ? value.slice(-2) : "";
-}
-
-function renderPdfText(value?: string) {
-  return value || "";
-}
-
-const SlipPreview = memo(function SlipPreview({
-  color,
-  titleNote,
   receiver,
   supplier,
-  previewRows,
   vatMode,
-  totalSupplyAmount,
-  totalTaxAmount,
   totalAmount,
   unpaidAmount,
   receiverSigner,
   supplierSigner,
+  notes,
   companySettings,
-}: SlipPreviewProps) {
+}: {
+  rows: StatementItem[];
+  color: string;
+  receiver: ClientData;
+  supplier: SupplierData;
+  vatMode: VatMode;
+  totalAmount: number;
+  unpaidAmount: number;
+  receiverSigner: string;
+  supplierSigner: string;
+  notes: string;
+  companySettings: CompanySettings;
+}) {
   const border = `1px solid ${color}`;
-  const outerBorder = `1.5px solid ${color}`;
-  const totalLabel =
-    vatMode === "included" ? "합계금액\n(VAT포함)" : "합계금액\n(VAT별도)";
-  const totalDisplayLabel =
-    vatMode === "included" ? "총합계(VAT포함)" : "총합계(VAT별도)";
-
-  const receiverRows = [
-    { label: "상 호\n(법인명)", value: receiver.companyName || "", rowHeight: 34 },
-    { label: "등록번호", value: receiver.businessNumber || "", rowHeight: 34 },
-    { label: "사업장\n주 소", value: receiver.address || "", rowHeight: 48 },
-    { label: "전화번호", value: receiver.phone || "", rowHeight: 34 },
-    { label: "팩스", value: receiver.fax || "", rowHeight: 34 },
-    { label: totalLabel, value: formatNumber(totalAmount), rowHeight: 40 },
-  ];
+  const outerBorder = `2px solid ${color}`;
+  const halfHeight = "652px";
 
   return (
     <div
       style={{
         width: "100%",
+        height: halfHeight,
         border: outerBorder,
-        backgroundColor: "#ffffff",
+        background: "#fff",
         boxSizing: "border-box",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
+      <div
+        style={{
+          height: "52px",
+          minHeight: "52px",
+          borderBottom: border,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontWeight: 800,
+          fontSize: "24px",
+          color,
+          letterSpacing: "-0.5px",
+          gap: "4px",
+          lineHeight: 1,
+        }}
+      >
+        <span>거래명세서</span>
+ <span style={{ fontSize: "13px", fontWeight: 700 }}>
+  {color === "#ff3b30" ? "(공급자 보관용)" : "(공급받는자 보관용)"}
+</span>
+      </div>
+
       <table
         style={{
           width: "100%",
-          tableLayout: "fixed",
           borderCollapse: "collapse",
-          backgroundColor: "#ffffff",
+          tableLayout: "fixed",
         }}
       >
+        <colgroup>
+          <col style={{ width: "48px" }} />
+          <col style={{ width: "104px" }} />
+          <col style={{ width: "220px" }} />
+          <col style={{ width: "48px" }} />
+          <col style={{ width: "92px" }} />
+          <col style={{ width: "206px" }} />
+          <col style={{ width: "92px" }} />
+          <col style={{ width: "154px" }} />
+        </colgroup>
         <tbody>
           <tr>
-            <PdfCell
-              height={54}
-              align="center"
-              fontSize={30}
-              fontWeight={800}
-              color={color}
-              letterSpacing={4}
-              borderBottom={outerBorder}
-              whiteSpace="nowrap"
+            <td
+              rowSpan={4}
+              style={{
+                borderRight: border,
+                borderBottom: border,
+                color,
+                fontWeight: 700,
+                textAlign: "center",
+                writingMode: "vertical-rl",
+                textOrientation: "mixed",
+                letterSpacing: "0px",
+                fontSize: "15px",
+                padding: "2px 0",
+                lineHeight: 1,
+              }}
             >
-              <span style={{ letterSpacing: "4px" }}>거래명세서</span>
-              <span
-                style={{
-                  marginLeft: "10px",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  letterSpacing: "0px",
-                }}
-              >
-                ({titleNote})
-              </span>
-            </PdfCell>
+              공급받는자
+            </td>
+            <td
+              style={{
+                borderRight: border,
+                borderBottom: border,
+                color,
+                fontWeight: 700,
+                textAlign: "center",
+                fontSize: "15px",
+                height: "32px",
+                lineHeight: 1,
+              }}
+            >
+              상호명
+            </td>
+            <td
+              style={{
+                borderRight: border,
+                borderBottom: border,
+                fontSize: "12px",
+                fontWeight: 600,
+                padding: "4px 8px",
+                height: "32px",
+                lineHeight: 1.15,
+              }}
+            >
+              {receiver.companyName || ""}
+            </td>
+
+            <td
+              rowSpan={4}
+              style={{
+                borderRight: border,
+                borderBottom: border,
+                color,
+                fontWeight: 700,
+                textAlign: "center",
+                writingMode: "vertical-rl",
+                textOrientation: "mixed",
+                letterSpacing: "0px",
+                fontSize: "15px",
+                padding: "2px 0",
+                lineHeight: 1,
+              }}
+            >
+              공급자
+            </td>
+            <td
+              style={{
+                borderRight: border,
+                borderBottom: border,
+                color,
+                fontWeight: 700,
+                textAlign: "center",
+                fontSize: "15px",
+                height: "32px",
+                lineHeight: 1,
+              }}
+            >
+              사업자번호
+            </td>
+            <td
+              style={{
+                borderRight: border,
+                borderBottom: border,
+                fontSize: "12px",
+                fontWeight: 600,
+                padding: "4px 8px",
+                height: "32px",
+                lineHeight: 1.15,
+              }}
+            >
+              {supplier.businessNumber || ""}
+            </td>
+            <td
+              style={{
+                borderRight: border,
+                borderBottom: border,
+                color,
+                fontWeight: 700,
+                textAlign: "center",
+                fontSize: "15px",
+                height: "32px",
+                lineHeight: 1,
+              }}
+            >
+              성명
+            </td>
+            <td
+              style={{
+                borderBottom: border,
+                fontSize: "12px",
+                fontWeight: 600,
+                padding: "4px 8px",
+                height: "32px",
+                lineHeight: 1.15,
+              }}
+            >
+              {supplier.ceoName || ""}
+            </td>
           </tr>
+
+          <tr>
+            <td
+              style={{
+                borderRight: border,
+                borderBottom: border,
+                color,
+                fontWeight: 700,
+                textAlign: "center",
+                fontSize: "15px",
+                height: "40px",
+                lineHeight: 1,
+              }}
+            >
+              사업장주소
+            </td>
+            <td
+              style={{
+                borderRight: border,
+                borderBottom: border,
+                fontSize: "11px",
+                fontWeight: 600,
+                padding: "4px 8px",
+                lineHeight: 1.15,
+                verticalAlign: "middle",
+                height: "40px",
+              }}
+            >
+              {receiver.address || ""}
+            </td>
+
+            <td
+              style={{
+                borderRight: border,
+                borderBottom: border,
+                color,
+                fontWeight: 700,
+                textAlign: "center",
+                fontSize: "15px",
+                height: "40px",
+                lineHeight: 1,
+              }}
+            >
+              상호명
+            </td>
+            <td
+              style={{
+                borderRight: border,
+                borderBottom: border,
+                fontSize: "12px",
+                fontWeight: 600,
+                padding: "4px 8px",
+                height: "40px",
+                lineHeight: 1.15,
+              }}
+            >
+ <div style={{ position: "relative", width: "100%", height: "100%" }}>
+
+  <div>{supplier.companyName || ""}</div>
+
+{companySettings?.stamp && (
+  <img
+    src={companySettings.stamp}
+      style={{
+        position: "absolute",
+        right: "6px",
+        top: "50%",
+        transform: "translateY(-50%)",
+        width: "52px",
+        opacity: 0.9,
+      }}
+    />
+  )}
+
+</div>
+            </td>
+            <td
+              style={{
+                borderRight: border,
+                borderBottom: border,
+                color,
+                fontWeight: 700,
+                textAlign: "center",
+                fontSize: "15px",
+                height: "40px",
+                lineHeight: 1,
+              }}
+            >
+              팩스
+            </td>
+            <td
+              style={{
+                borderBottom: border,
+                fontSize: "12px",
+                fontWeight: 600,
+                padding: "4px 8px",
+                height: "40px",
+                lineHeight: 1.15,
+              }}
+            >
+              {supplier.fax || ""}
+            </td>
+          </tr>
+
+          <tr>
+            <td
+              style={{
+                borderRight: border,
+                borderBottom: border,
+                color,
+                fontWeight: 700,
+                textAlign: "center",
+                fontSize: "15px",
+                height: "32px",
+                lineHeight: 1,
+              }}
+            >
+              전화번호
+            </td>
+            <td
+              style={{
+                borderRight: border,
+                borderBottom: border,
+                fontSize: "12px",
+                fontWeight: 600,
+                padding: "4px 8px",
+                height: "32px",
+                lineHeight: 1.15,
+              }}
+            >
+              {receiver.phone || ""}
+            </td>
+
+            <td
+              style={{
+                borderRight: border,
+                borderBottom: border,
+                color,
+                fontWeight: 700,
+                textAlign: "center",
+                fontSize: "15px",
+                height: "32px",
+                lineHeight: 1,
+              }}
+            >
+              사업장주소
+            </td>
+            <td
+              style={{
+                borderRight: border,
+                borderBottom: border,
+                fontSize: "11px",
+                fontWeight: 600,
+                padding: "4px 8px",
+                lineHeight: 1.15,
+                verticalAlign: "middle",
+                height: "32px",
+              }}
+            >
+              {supplier.address || ""}
+            </td>
+            <td
+              style={{
+                borderRight: border,
+                borderBottom: border,
+                color,
+                fontWeight: 700,
+                textAlign: "center",
+                fontSize: "15px",
+                height: "32px",
+                lineHeight: 1,
+              }}
+            >
+              VAT
+            </td>
+            <td
+              style={{
+                borderBottom: border,
+                fontSize: "12px",
+                fontWeight: 700,
+                padding: "4px 8px",
+                height: "32px",
+                lineHeight: 1.15,
+              }}
+            >
+              {vatMode === "included" ? "포함" : "별도"}
+            </td>
+          </tr>
+
+<tr>
+  <td
+    style={{
+      borderRight: border,
+      borderBottom: border,
+      color,
+      fontWeight: 700,
+      textAlign: "center",
+      fontSize: "15px",
+      lineHeight: 1.05,
+      height: "36px",
+    }}
+  >
+    합계금액
+  </td>
+
+  <td
+    style={{
+      borderRight: border,
+      borderBottom: border,
+      fontSize: "12px",
+      fontWeight: 700,
+      padding: "4px 8px",
+      height: "36px",
+      lineHeight: 1.15,
+    }}
+  >
+    {formatNumber(totalAmount)}
+  </td>
+
+  <td
+    style={{
+      borderRight: border,
+      borderBottom: border,
+      color,
+      fontWeight: 700,
+      textAlign: "center",
+      fontSize: "15px",
+      height: "36px",
+      lineHeight: 1,
+    }}
+  >
+    전화
+  </td>
+
+  <td
+    style={{
+      borderRight: border,
+      borderBottom: border,
+      fontSize: "12px",
+      fontWeight: 600,
+      padding: "4px 8px",
+      height: "36px",
+      lineHeight: 1.15,
+    }}
+  >
+    {supplier.phone || ""}
+  </td>
+
+  <td
+    style={{
+      borderRight: border,
+      borderBottom: border,
+      color,
+      fontWeight: 700,
+      textAlign: "center",
+      fontSize: "15px",
+      height: "36px",
+      lineHeight: 1,
+    }}
+  >
+    비고
+  </td>
+
+  <td
+    style={{
+      borderBottom: border,
+      fontSize: "11px",
+      fontWeight: 600,
+      padding: "4px 8px",
+      lineHeight: 1.1,
+      height: "36px",
+    }}
+  >
+    {notes || ""}
+  </td>
+</tr>
         </tbody>
       </table>
 
       <table
         style={{
           width: "100%",
-          tableLayout: "fixed",
           borderCollapse: "collapse",
-          backgroundColor: "#ffffff",
+          tableLayout: "fixed",
+          marginTop: "-1px",
+          flex: 1,
         }}
       >
         <colgroup>
-          <col style={{ width: "34px" }} />
-          <col style={{ width: "292px" }} />
-          <col style={{ width: "34px" }} />
-          <col style={{ width: "calc(100% - 360px)" }} />
+          {previewColWidths.map((width, index) => (
+            <col key={index} style={{ width: `${width}px` }} />
+          ))}
         </colgroup>
-        <tbody>
+        <thead>
           <tr>
-            <PdfCell
-              align="center"
-              vAlign="middle"
-              fontSize={12}
-              fontWeight={700}
-              color={color}
-              borderRight={outerBorder}
-              borderBottom={outerBorder}
-              whiteSpace="pre-line"
-              padding="0"
-            >
-              <div
-                style={{
-                  writingMode: "vertical-rl",
-                  textOrientation: "mixed",
-                  width: "100%",
-                  height: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  letterSpacing: "1px",
-                }}
-              >
-                공급받는자
-              </div>
-            </PdfCell>
-
-            <PdfCell padding="0" borderRight={outerBorder} borderBottom={outerBorder}>
-              <table
-                style={{
-                  width: "100%",
-                  tableLayout: "fixed",
-                  borderCollapse: "collapse",
-                  backgroundColor: "#ffffff",
-                }}
-              >
-                <colgroup>
-                  <col style={{ width: "92px" }} />
-                  <col style={{ width: "200px" }} />
-                </colgroup>
-                <tbody>
-                  {receiverRows.map((row, index) => {
-                    const isLast = index === receiverRows.length - 1;
-                    return (
-                      <tr key={`receiver-${index}`}>
-                        <PdfCell
-                          height={row.rowHeight}
-                          align="center"
-                          fontSize={12}
-                          fontWeight={700}
-                          color={color}
-                          whiteSpace="pre-line"
-                          padding="0 6px"
-                          borderRight={border}
-                          borderBottom={isLast ? undefined : border}
-                          lineHeight={1.15}
-                        >
-                          {row.label}
-                        </PdfCell>
-                        <PdfCell
-                          height={row.rowHeight}
-                          fontSize={12}
-                          whiteSpace={index === 2 ? "pre-line" : "nowrap"}
-                          padding="0 10px"
-                          borderBottom={isLast ? undefined : border}
-                          lineHeight={1.2}
-                        >
-                          {row.value || ""}
-                        </PdfCell>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </PdfCell>
-
-            <PdfCell
-              align="center"
-              vAlign="middle"
-              fontSize={12}
-              fontWeight={700}
-              color={color}
-              borderRight={outerBorder}
-              borderBottom={outerBorder}
-              whiteSpace="pre-line"
-              padding="0"
-            >
-              <div
-                style={{
-                  writingMode: "vertical-rl",
-                  textOrientation: "mixed",
-                  width: "100%",
-                  height: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  letterSpacing: "1px",
-                }}
-              >
-                공급자
-              </div>
-            </PdfCell>
-
-            <PdfCell padding="0" borderBottom={outerBorder}>
-              <div style={{ position: "relative", width: "100%", height: "100%" }}>
-                <table
+            {["년", "월", "일", "품목", "규격", "단위", "수량", "단가", "공급가액", "세액"].map(
+              (label) => (
+                <th
+                  key={label}
                   style={{
-                    width: "100%",
-                    tableLayout: "fixed",
-                    borderCollapse: "collapse",
-                    backgroundColor: "#ffffff",
+                    border: border,
+                    color,
+                    fontWeight: 800,
+                    textAlign: "center",
+                    fontSize: "14px",
+                    height: "28px",
+                    lineHeight: 1,
+                    padding: 0,
                   }}
                 >
-                  <colgroup>
-                    <col style={{ width: "78px" }} />
-                    <col style={{ width: "144px" }} />
-                    <col style={{ width: "52px" }} />
-                    <col style={{ width: "calc(100% - 274px)" }} />
-                  </colgroup>
-                  <tbody>
-                    <tr>
-                      <PdfCell
-                        height={34}
-                        align="center"
-                        fontSize={12}
-                        fontWeight={700}
-                        color={color}
-                        borderRight={border}
-                        borderBottom={border}
-                      >
-                        등록번호
-                      </PdfCell>
-                      <PdfCell
-                        height={34}
-                        fontSize={12}
-                        whiteSpace="nowrap"
-                        padding="0 10px"
-                        borderBottom={border}
-                      >
-                        {supplier.businessNumber || ""}
-                      </PdfCell>
-                      <PdfCell
-                        height={34}
-                        align="center"
-                        fontSize={12}
-                        fontWeight={700}
-                        color={color}
-                        borderLeft={border}
-                        borderRight={border}
-                        borderBottom={border}
-                      >
-                        성명
-                      </PdfCell>
-                      <PdfCell
-                        height={34}
-                        fontSize={12}
-                        whiteSpace="nowrap"
-                        padding="0 10px"
-                        borderBottom={border}
-                      >
-                        {supplier.ceoName || ""}
-                      </PdfCell>
-                    </tr>
-
-                    <tr>
-                      <PdfCell
-                        height={34}
-                        align="center"
-                        fontSize={12}
-                        fontWeight={700}
-                        color={color}
-                        whiteSpace="pre-line"
-                        borderRight={border}
-                        borderBottom={border}
-                        padding="0 6px"
-                      >
-                        상 호
-                        {"\n"}
-                        (법인명)
-                      </PdfCell>
-                      <PdfCell
-                        height={34}
-                        fontSize={12}
-                        whiteSpace="nowrap"
-                        padding="0 10px"
-                        borderBottom={border}
-                      >
-                        {supplier.companyName || ""}
-                      </PdfCell>
-                      <PdfCell
-                        height={34}
-                        align="center"
-                        fontSize={12}
-                        fontWeight={700}
-                        color={color}
-                        borderLeft={border}
-                        borderRight={border}
-                        borderBottom={border}
-                      >
-                        전화
-                      </PdfCell>
-                      <PdfCell
-                        height={34}
-                        fontSize={12}
-                        whiteSpace="nowrap"
-                        padding="0 10px"
-                        borderBottom={border}
-                      >
-                        {supplier.phone || ""}
-                      </PdfCell>
-                    </tr>
-
-                    <tr>
-                      <PdfCell
-                        height={48}
-                        align="center"
-                        fontSize={12}
-                        fontWeight={700}
-                        color={color}
-                        whiteSpace="pre-line"
-                        borderRight={border}
-                        borderBottom={border}
-                        padding="0 6px"
-                        lineHeight={1.15}
-                      >
-                        사업장
-                        {"\n"}
-                        주소
-                      </PdfCell>
-                      <PdfCell
-                        height={48}
-                        fontSize={11}
-                        whiteSpace="pre-line"
-                        padding="4px 10px"
-                        borderBottom={border}
-                        lineHeight={1.25}
-                      >
-                        {supplier.address || ""}
-                      </PdfCell>
-                      <PdfCell
-                        height={48}
-                        align="center"
-                        fontSize={12}
-                        fontWeight={700}
-                        color={color}
-                        borderLeft={border}
-                        borderRight={border}
-                        borderBottom={border}
-                      >
-                        팩스
-                      </PdfCell>
-                      <PdfCell
-                        height={48}
-                        fontSize={12}
-                        whiteSpace="nowrap"
-                        padding="0 10px"
-                        borderBottom={border}
-                      >
-                        {supplier.fax || ""}
-                      </PdfCell>
-                    </tr>
-
-                    <tr>
-                      <PdfCell
-                        height={34}
-                        align="center"
-                        fontSize={12}
-                        fontWeight={700}
-                        color={color}
-                        borderRight={border}
-                        borderBottom={border}
-                      >
-                        VAT
-                      </PdfCell>
-                      <PdfCell
-                        height={34}
-                        fontSize={12}
-                        whiteSpace="nowrap"
-                        padding="0 10px"
-                        borderBottom={border}
-                      >
-                        {vatMode === "included" ? "포함" : "별도"}
-                      </PdfCell>
-                      <PdfCell
-                        height={34}
-                        align="center"
-                        fontSize={12}
-                        fontWeight={700}
-                        color={color}
-                        borderLeft={border}
-                        borderRight={border}
-                        borderBottom={border}
-                      >
-                        비고
-                      </PdfCell>
-                      <PdfCell
-                        height={34}
-                        fontSize={12}
-                        whiteSpace="nowrap"
-                        padding="0 10px"
-                        borderBottom={border}
-                      >
-                        -
-                      </PdfCell>
-                    </tr>
-
-                    <tr>
-                      <PdfCell
-                        height={40}
-                        align="center"
-                        fontSize={12}
-                        fontWeight={700}
-                        color={color}
-                        whiteSpace="pre-line"
-                        borderRight={border}
-                        padding="0 6px"
-                        lineHeight={1.15}
-                      >
-                        합계금액
-                        {"\n"}
-                        {vatMode === "included" ? "(VAT포함)" : "(VAT별도)"}
-                      </PdfCell>
-                      <PdfCell
-                        height={40}
-                        align="right"
-                        fontSize={12}
-                        whiteSpace="nowrap"
-                        padding="0 12px"
-                      >
-                        <span style={{ fontVariantNumeric: "tabular-nums" }}>
-                          {formatNumber(totalAmount)}
-                        </span>
-                      </PdfCell>
-                      <PdfCell
-                        height={40}
-                        borderLeft={border}
-                        borderRight={border}
-                      />
-                      <PdfCell height={40} />
-                    </tr>
-                  </tbody>
-                </table>
-
-                {companySettings.stampDataUrl ? (
-                  <img
-                    src={companySettings.stampDataUrl}
-                    alt="stamp"
-                    style={{
-                      position: "absolute",
-                      right: "14px",
-                      top: "48px",
-                      width: "48px",
-                      height: "48px",
-                      objectFit: "contain",
-                      opacity: 0.9,
-                    }}
-                  />
-                ) : null}
-              </div>
-            </PdfCell>
+                  {label}
+                </th>
+              )
+            )}
           </tr>
-        </tbody>
-      </table>
-
-      <table
-        style={{
-          width: "100%",
-          tableLayout: "fixed",
-          borderCollapse: "collapse",
-          backgroundColor: "#ffffff",
-        }}
-      >
-        <colgroup>
-          <col style={{ width: "26px" }} />
-          <col style={{ width: "26px" }} />
-          <col style={{ width: "26px" }} />
-          <col style={{ width: "188px" }} />
-          <col style={{ width: "72px" }} />
-          <col style={{ width: "46px" }} />
-          <col style={{ width: "56px" }} />
-          <col style={{ width: "64px" }} />
-          <col style={{ width: "74px" }} />
-          <col style={{ width: "64px" }} />
-        </colgroup>
+        </thead>
         <tbody>
-          <tr>
-            <PdfCell
-              height={28}
-              align="center"
-              fontSize={11}
-              fontWeight={700}
-              color={color}
-              borderRight={border}
-              borderBottom={border}
-            >
-              년
-            </PdfCell>
-            <PdfCell
-              height={28}
-              align="center"
-              fontSize={11}
-              fontWeight={700}
-              color={color}
-              borderRight={border}
-              borderBottom={border}
-            >
-              월
-            </PdfCell>
-            <PdfCell
-              height={28}
-              align="center"
-              fontSize={11}
-              fontWeight={700}
-              color={color}
-              borderRight={border}
-              borderBottom={border}
-            >
-              일
-            </PdfCell>
-            <PdfCell
-              height={28}
-              align="center"
-              fontSize={11}
-              fontWeight={700}
-              color={color}
-              borderRight={border}
-              borderBottom={border}
-            >
-              품목
-            </PdfCell>
-            <PdfCell
-              height={28}
-              align="center"
-              fontSize={11}
-              fontWeight={700}
-              color={color}
-              borderRight={border}
-              borderBottom={border}
-            >
-              규격
-            </PdfCell>
-            <PdfCell
-              height={28}
-              align="center"
-              fontSize={11}
-              fontWeight={700}
-              color={color}
-              borderRight={border}
-              borderBottom={border}
-            >
-              단위
-            </PdfCell>
-            <PdfCell
-              height={28}
-              align="center"
-              fontSize={11}
-              fontWeight={700}
-              color={color}
-              borderRight={border}
-              borderBottom={border}
-            >
-              수량
-            </PdfCell>
-            <PdfCell
-              height={28}
-              align="center"
-              fontSize={11}
-              fontWeight={700}
-              color={color}
-              borderRight={border}
-              borderBottom={border}
-            >
-              단가
-            </PdfCell>
-            <PdfCell
-              height={28}
-              align="center"
-              fontSize={11}
-              fontWeight={700}
-              color={color}
-              borderRight={border}
-              borderBottom={border}
-            >
-              공급가액
-            </PdfCell>
-            <PdfCell
-              height={28}
-              align="center"
-              fontSize={11}
-              fontWeight={700}
-              color={color}
-              borderBottom={border}
-            >
-              세액
-            </PdfCell>
-          </tr>
-
-          {previewRows.map((row, index) => (
-            <tr key={`${titleNote}-${row.id}-${index}`}>
-              <PdfCell
-                height={24}
-                align="center"
-                fontSize={10}
-                borderRight={border}
-                borderBottom={border}
-                padding="0 4px"
-                whiteSpace="nowrap"
+          {rows.map((row, index) => (
+            <tr key={`${row.id}-${index}`}>
+              <td
+                style={{
+                  border,
+                  height: "26px",
+                  textAlign: "center",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  lineHeight: 1,
+                  padding: 0,
+                }}
               >
-                {renderPdfYear(row.dateYear)}
-              </PdfCell>
-              <PdfCell
-                height={24}
-                align="center"
-                fontSize={10}
-                borderRight={border}
-                borderBottom={border}
-                padding="0 4px"
-                whiteSpace="nowrap"
+                {row.dateYear || ""}
+              </td>
+              <td
+                style={{
+                  border,
+                  textAlign: "center",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  lineHeight: 1,
+                  padding: 0,
+                }}
               >
-                {renderPdfText(row.dateMonth)}
-              </PdfCell>
-              <PdfCell
-                height={24}
-                align="center"
-                fontSize={10}
-                borderRight={border}
-                borderBottom={border}
-                padding="0 4px"
-                whiteSpace="nowrap"
+                {row.dateMonth || ""}
+              </td>
+              <td
+                style={{
+                  border,
+                  textAlign: "center",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  lineHeight: 1,
+                  padding: 0,
+                }}
               >
-                {renderPdfText(row.dateDay)}
-              </PdfCell>
-              <PdfCell
-                height={24}
-                fontSize={10}
-                borderRight={border}
-                borderBottom={border}
-                padding="0 6px"
-                whiteSpace="nowrap"
+                {row.dateDay || ""}
+              </td>
+              <td
+                style={{
+                  border,
+                  padding: "0 6px",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  lineHeight: 1.05,
+                }}
               >
-                {renderPdfText(row.productName)}
-              </PdfCell>
-              <PdfCell
-                height={24}
-                fontSize={10}
-                borderRight={border}
-                borderBottom={border}
-                padding="0 6px"
-                whiteSpace="nowrap"
+                {row.productName || ""}
+              </td>
+              <td
+                style={{
+                  border,
+                  textAlign: "center",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  lineHeight: 1.05,
+                  padding: 0,
+                }}
               >
-                {renderPdfText(row.spec)}
-              </PdfCell>
-              <PdfCell
-                height={24}
-                align="center"
-                fontSize={10}
-                borderRight={border}
-                borderBottom={border}
-                padding="0 4px"
-                whiteSpace="nowrap"
+                {row.spec || ""}
+              </td>
+              <td
+                style={{
+                  border,
+                  textAlign: "center",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  lineHeight: 1.05,
+                  padding: 0,
+                }}
               >
-                {renderPdfText(row.unit)}
-              </PdfCell>
-              <PdfCell
-                height={24}
-                align="right"
-                fontSize={10}
-                borderRight={border}
-                borderBottom={border}
-                padding="0 6px"
-                whiteSpace="nowrap"
+                {row.unit || ""}
+              </td>
+              <td
+                style={{
+                  border,
+                  textAlign: "center",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  lineHeight: 1.05,
+                  padding: 0,
+                }}
               >
-                <span style={{ fontVariantNumeric: "tabular-nums" }}>
-                  {row.quantity ? formatNumber(row.quantity) : ""}
-                </span>
-              </PdfCell>
-              <PdfCell
-                height={24}
-                align="right"
-                fontSize={10}
-                borderRight={border}
-                borderBottom={border}
-                padding="0 6px"
-                whiteSpace="nowrap"
+                {row.quantity ? formatNumber(row.quantity) : ""}
+              </td>
+              <td
+                style={{
+                  border,
+                  textAlign: "center",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  lineHeight: 1.05,
+                  padding: 0,
+                }}
               >
-                <span style={{ fontVariantNumeric: "tabular-nums" }}>
-                  {renderPdfAmount(row.unitPrice)}
-                </span>
-              </PdfCell>
-              <PdfCell
-                height={24}
-                align="right"
-                fontSize={10}
-                borderRight={border}
-                borderBottom={border}
-                padding="0 6px"
-                whiteSpace="nowrap"
+                {row.unitPrice ? formatNumber(row.unitPrice) : ""}
+              </td>
+              <td
+                style={{
+                  border,
+                  textAlign: "center",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  lineHeight: 1.05,
+                  padding: 0,
+                }}
               >
-                <span style={{ fontVariantNumeric: "tabular-nums" }}>
-                  {renderPdfAmount(row.supplyAmount)}
-                </span>
-              </PdfCell>
-              <PdfCell
-                height={24}
-                align="right"
-                fontSize={10}
-                borderBottom={border}
-                padding="0 6px"
-                whiteSpace="nowrap"
+                {row.supplyAmount ? formatNumber(row.supplyAmount) : ""}
+              </td>
+              <td
+                style={{
+                  border,
+                  textAlign: "center",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  lineHeight: 1.05,
+                  padding: 0,
+                }}
               >
-                <span style={{ fontVariantNumeric: "tabular-nums" }}>
-                  {renderPdfAmount(row.taxAmount)}
-                </span>
-              </PdfCell>
+                {row.taxAmount ? formatNumber(row.taxAmount) : ""}
+              </td>
             </tr>
           ))}
 
-          <tr>
-            <PdfCell
-              colSpan={4 as any}
-              height={32}
-              borderRight={border}
-              borderBottom={border}
-            />
-            <PdfCell
-              colSpan={2 as any}
-              height={32}
-              align="center"
-              fontSize={12}
-              fontWeight={700}
-              color={color}
-              borderRight={border}
-              borderBottom={border}
-            >
-              공급가액
-            </PdfCell>
-            <PdfCell
-              colSpan={2 as any}
-              height={32}
-              align="right"
-              fontSize={12}
-              borderRight={border}
-              borderBottom={border}
-              padding="0 10px"
-              whiteSpace="nowrap"
-            >
-              <span style={{ fontVariantNumeric: "tabular-nums" }}>
-                {formatNumber(totalSupplyAmount)}
-              </span>
-            </PdfCell>
-            <PdfCell
-              height={32}
-              align="center"
-              fontSize={12}
-              fontWeight={700}
-              color={color}
-              borderRight={border}
-              borderBottom={border}
-            >
-              세액
-            </PdfCell>
-            <PdfCell
-              height={32}
-              align="right"
-              fontSize={12}
-              borderBottom={border}
-              padding="0 10px"
-              whiteSpace="nowrap"
-            >
-              <span style={{ fontVariantNumeric: "tabular-nums" }}>
-                {formatNumber(totalTaxAmount)}
-              </span>
-            </PdfCell>
-          </tr>
+<tr>
+  <td colSpan={3} style={{ border, height: "26px", textAlign: "center", fontSize: "12px", fontWeight: 900, color, padding: 0 }}>
+    인수자
+  </td>
 
-          <tr>
-            <PdfCell
-              height={32}
-              align="center"
-              fontSize={12}
-              fontWeight={700}
-              color={color}
-              borderRight={border}
-            >
-              인수자
-            </PdfCell>
-            <PdfCell
-              colSpan={2 as any}
-              height={32}
-              align="center"
-              fontSize={12}
-              borderRight={border}
-              whiteSpace="nowrap"
-            >
-              {receiverSigner}
-            </PdfCell>
-            <PdfCell
-              height={32}
-              align="center"
-              fontSize={12}
-              fontWeight={700}
-              color={color}
-              borderRight={border}
-            >
-              납품자
-            </PdfCell>
-            <PdfCell
-              colSpan={2 as any}
-              height={32}
-              align="center"
-              fontSize={12}
-              borderRight={border}
-              whiteSpace="nowrap"
-            >
-              {supplierSigner}
-            </PdfCell>
-            <PdfCell
-              height={32}
-              align="center"
-              fontSize={12}
-              fontWeight={700}
-              color={color}
-              borderRight={border}
-            >
-              미수금
-            </PdfCell>
-            <PdfCell
-              colSpan={3 as any}
-              height={32}
-              align="right"
-              fontSize={12}
-              padding="0 10px"
-              whiteSpace="nowrap"
-            >
-              <span style={{ fontVariantNumeric: "tabular-nums" }}>
-                {formatNumber(unpaidAmount)}
-              </span>
-            </PdfCell>
-          </tr>
+  <td style={{ border, height: "26px", textAlign: "center", fontSize: "12px", fontWeight: 700, padding: 0 }}>
+  <div style={{ position: "relative", width: "100%", height: "100%" }}>
+
+  <div
+    style={{
+      position: "absolute",
+      left: "50%",
+      top: "50%",
+      transform: "translate(-50%, -50%)",
+    }}
+  >
+    {receiverSigner || ""}
+  </div>
+
+  <div
+    style={{
+      position: "absolute",
+      right: "6px",
+      top: "50%",
+      transform: "translateY(-50%)",
+      fontSize: "10px",
+    }}
+  >
+    서명
+  </div>
+
+</div>
+  </td>
+
+  <td colSpan={2} style={{ border, height: "26px", textAlign: "center", fontSize: "12px", fontWeight: 900, color, padding: 2 }}>
+    납품자
+  </td>
+
+  <td colSpan={2} style={{ border, height: "26px", textAlign: "center", fontSize: "12px", fontWeight: 700, padding: 0 }}>
+   <div style={{ position: "relative", width: "100%", height: "100%" }}>
+
+  <div
+    style={{
+      position: "absolute",
+      left: "50%",
+      top: "50%",
+      transform: "translate(-50%, -50%)",
+    }}
+  >
+    {supplierSigner || ""}
+  </div>
+
+  <div
+    style={{
+      position: "absolute",
+      right: "6px",
+      top: "50%",
+      transform: "translateY(-50%)",
+      fontSize: "10px",
+    }}
+  >
+    서명
+  </div>
+
+</div>
+  </td>
+
+  <td style={{ border, height: "26px", textAlign: "center", fontSize: "12px", fontWeight: 900, color, padding: 0 }}>
+    미수금
+  </td>
+
+  <td style={{ border, height: "26px", textAlign: "center", fontSize: "12px", fontWeight: 700, padding: 0 }}>
+    {formatNumber(unpaidAmount || 0)}
+  </td>
+</tr>
         </tbody>
       </table>
     </div>
   );
-});
+}
 
-type ItemRowProps = {
-  item: StatementItem;
-  index: number;
-  isSelected: boolean;
-  onToggleSelect: (id: string) => void;
-  onChange: (
-    id: string,
-    key: keyof StatementItem,
-    value: string | number
-  ) => void;
-  onRemove: (id: string) => void;
-  onDuplicate: (id: string) => void;
-  registerInput: (
-    itemId: string,
-    field: EditableField,
-    el: HTMLInputElement | null
-  ) => void;
-  onCellNavigate: (
-    rowIndex: number,
-    field: EditableField,
-    action: "enter" | "up" | "down" | "left" | "right" | "tab" | "shiftTab"
-  ) => void;
-};
+function StatementPagePreview({
+  pageIndex,
+  pageRows,
+  receiver,
+  supplier,
+  vatMode,
+  totalAmount,
+  unpaidAmount,
+  receiverSigner,
+  supplierSigner,
+  notes,
+  companySettings,
+  setPageRef,
+}: StatementPagePreviewProps) {
+  return (
+    <div
+      ref={(el) => setPageRef(pageIndex, el)}
+      style={{
+        width: "1000px",
+        minHeight: "1414px",
+        height: "1414px",
+        background: "#ffffff",
+        boxSizing: "border-box",
+        padding: "28px",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "grid",
+          gridTemplateRows: "1fr 1fr",
+          gap: "26px",
+        }}
+      >
+        <StatementHalfDocument
+          rows={pageRows.topRows}
+          color="#4b65ff"
+          receiver={receiver}
+          supplier={supplier}
+          vatMode={vatMode}
+          totalAmount={totalAmount}
+          unpaidAmount={unpaidAmount}
+          receiverSigner={receiverSigner}
+          supplierSigner={supplierSigner}
+          notes={notes}
+          companySettings={companySettings}
+        />
 
-const ItemRow = memo(
-  function ItemRow({
-    item,
-    index,
-    isSelected,
-    onToggleSelect,
-    onChange,
-    onRemove,
-    onDuplicate,
-    registerInput,
-    onCellNavigate,
-  }: ItemRowProps) {
-    const handleTextChange = useCallback(
-      (key: keyof StatementItem, value: string) => {
-        onChange(item.id, key, value);
-      },
-      [item.id, onChange]
-    );
+        <StatementHalfDocument
+          rows={pageRows.bottomRows}
+          color="#ff3b30"
+          receiver={receiver}
+          supplier={supplier}
+          vatMode={vatMode}
+          totalAmount={totalAmount}
+          unpaidAmount={unpaidAmount}
+          receiverSigner={receiverSigner}
+          supplierSigner={supplierSigner}
+          notes={notes}
+          companySettings={companySettings}
+        />
+      </div>
+    </div>
+  );
+}
 
-    const handleNumberChange = useCallback(
-      (key: keyof StatementItem, value: number) => {
-        onChange(item.id, key, value);
-      },
-      [item.id, onChange]
-    );
+const ItemRow = memo(function ItemRow({
+  item,
+  index,
+  vatMode,
+  isSelected,
+  onToggleSelect,
+  onChange,
+  onRemove,
+  onDuplicate,
+  registerInput,
+  onCellNavigate,
+}: ItemRowProps) {
+  const yearValue = item.dateYear || "";
+  const monthValue = item.dateMonth || "";
+  const dayValue = item.dateDay || "";
+  const productNameValue = item.productName || "";
+  const specValue = item.spec || "";
+  const unitValue = item.unit || "";
+  const quantityValue = item.quantity ? String(item.quantity) : "";
+  const unitPriceValue = item.unitPrice ? String(item.unitPrice) : "";
+  const supplyAmountValue = item.supplyAmount ? String(item.supplyAmount) : "";
+  const taxAmountValue = item.taxAmount ? String(item.taxAmount) : "";
 
-    const handleKeyDown = useCallback(
-      (e: React.KeyboardEvent<HTMLInputElement>, field: EditableField) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          onCellNavigate(index, field, "enter");
-          return;
-        }
-
-        if (e.key === "Tab") {
-          e.preventDefault();
-          onCellNavigate(index, field, e.shiftKey ? "shiftTab" : "tab");
-          return;
-        }
-
-        if (e.key === "ArrowUp") {
-          e.preventDefault();
-          onCellNavigate(index, field, "up");
-          return;
-        }
-
-        if (e.key === "ArrowDown") {
-          e.preventDefault();
-          onCellNavigate(index, field, "down");
-          return;
-        }
-
-        if (e.key === "ArrowLeft" && canMoveLeftRightCell(e, "left")) {
+  const handleKeyDown =
+    (field: EditableField) => (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        onCellNavigate(index, field, "enter");
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        onCellNavigate(index, field, "up");
+        return;
+      }
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        onCellNavigate(index, field, "down");
+        return;
+      }
+      if (e.key === "ArrowLeft") {
+        if (getCellMoveAllowed(e, "left")) {
           e.preventDefault();
           onCellNavigate(index, field, "left");
-          return;
         }
-
-        if (e.key === "ArrowRight" && canMoveLeftRightCell(e, "right")) {
+        return;
+      }
+      if (e.key === "ArrowRight") {
+        if (getCellMoveAllowed(e, "right")) {
           e.preventDefault();
           onCellNavigate(index, field, "right");
         }
-      },
-      [index, onCellNavigate]
-    );
+        return;
+      }
+      if (e.key === "Tab") {
+        e.preventDefault();
+        onCellNavigate(index, field, e.shiftKey ? "shiftTab" : "tab");
+      }
+    };
 
-    const handleRemove = useCallback(() => {
-      onRemove(item.id);
-    }, [item.id, onRemove]);
+  const inputBaseClassName =
+    "h-11 w-full border-r border-b border-gray-200 bg-white px-3 text-[13px] text-gray-800 outline-none placeholder:text-gray-300 focus:bg-[#f8fbff]";
+  const centerClassName = `${inputBaseClassName} text-center`;
+  const rightClassName = `${inputBaseClassName} text-right`;
 
-    const handleDuplicate = useCallback(() => {
-      onDuplicate(item.id);
-    }, [item.id, onDuplicate]);
-
-    const handleToggleSelect = useCallback(() => {
-      onToggleSelect(item.id);
-    }, [item.id, onToggleSelect]);
-
-    return (
-      <div
-        className={`grid grid-cols-[54px_64px_64px_64px_minmax(220px,2.1fr)_minmax(130px,1fr)_90px_100px_140px_150px_140px_140px] border-b text-[13px] ${
-          isSelected ? "bg-gray-100" : "bg-white"
-        }`}
-      >
-        <div className="border-r border-gray-200 p-2">
-          <button
-            type="button"
-            onClick={handleToggleSelect}
-            className={`flex h-10 w-full items-center justify-center rounded-xl border text-[12px] font-semibold ${
-              isSelected
-                ? "border-gray-900 bg-gray-900 text-white"
-                : "border-gray-300 bg-white text-gray-700"
-            }`}
-          >
-            선택
-          </button>
-        </div>
-
-        <div className="border-r border-gray-200 p-2">
-          <input
-            ref={(el) => registerInput(item.id, "dateYear", el)}
-            value={item.dateYear}
-            onChange={(e) => handleTextChange("dateYear", e.target.value)}
-            onKeyDown={(e) => handleKeyDown(e, "dateYear")}
-            className="h-10 w-full rounded-xl border border-gray-300 bg-white px-2 text-center outline-none focus:border-gray-900"
-          />
-        </div>
-
-        <div className="border-r border-gray-200 p-2">
-          <input
-            ref={(el) => registerInput(item.id, "dateMonth", el)}
-            value={item.dateMonth}
-            onChange={(e) => handleTextChange("dateMonth", e.target.value)}
-            onKeyDown={(e) => handleKeyDown(e, "dateMonth")}
-            className="h-10 w-full rounded-xl border border-gray-300 bg-white px-2 text-center outline-none focus:border-gray-900"
-          />
-        </div>
-
-        <div className="border-r border-gray-200 p-2">
-          <input
-            ref={(el) => registerInput(item.id, "dateDay", el)}
-            value={item.dateDay}
-            onChange={(e) => handleTextChange("dateDay", e.target.value)}
-            onKeyDown={(e) => handleKeyDown(e, "dateDay")}
-            className="h-10 w-full rounded-xl border border-gray-300 bg-white px-2 text-center outline-none focus:border-gray-900"
-          />
-        </div>
-
-        <div className="border-r border-gray-200 p-2">
-          <input
-            ref={(el) => registerInput(item.id, "productName", el)}
-            value={item.productName}
-            onChange={(e) => handleTextChange("productName", e.target.value)}
-            onKeyDown={(e) => handleKeyDown(e, "productName")}
-            placeholder={`품목 ${index + 1}`}
-            className="h-10 w-full rounded-xl border border-gray-300 bg-white px-3 outline-none focus:border-gray-900"
-          />
-        </div>
-
-        <div className="border-r border-gray-200 p-2">
-          <input
-            ref={(el) => registerInput(item.id, "spec", el)}
-            value={item.spec}
-            onChange={(e) => handleTextChange("spec", e.target.value)}
-            onKeyDown={(e) => handleKeyDown(e, "spec")}
-            placeholder="규격"
-            className="h-10 w-full rounded-xl border border-gray-300 bg-white px-3 outline-none focus:border-gray-900"
-          />
-        </div>
-
-        <div className="border-r border-gray-200 p-2">
-          <input
-            ref={(el) => registerInput(item.id, "unit", el)}
-            value={item.unit}
-            onChange={(e) => handleTextChange("unit", e.target.value)}
-            onKeyDown={(e) => handleKeyDown(e, "unit")}
-            className="h-10 w-full rounded-xl border border-gray-300 bg-white px-2 text-center outline-none focus:border-gray-900"
-          />
-        </div>
-
-        <div className="border-r border-gray-200 p-2">
-          <input
-            ref={(el) => registerInput(item.id, "quantity", el)}
-            type="number"
-            value={item.quantity === 0 ? "" : item.quantity}
-            onFocus={(e) => {
-              if (item.quantity === 0) e.target.value = "";
-            }}
-            onBlur={(e) => {
-              if (e.target.value === "") {
-                handleNumberChange("quantity", 1);
-              }
-            }}
-            onChange={(e) =>
-              handleNumberChange("quantity", Number(e.target.value || 1))
-            }
-            onKeyDown={(e) => handleKeyDown(e, "quantity")}
-            className="h-10 w-full rounded-xl border border-gray-300 bg-white px-3 text-right outline-none focus:border-gray-900"
-          />
-        </div>
-
-        <div className="border-r border-gray-200 p-2">
-          <input
-            ref={(el) => registerInput(item.id, "unitPrice", el)}
-            type="number"
-            value={item.unitPrice === 0 ? "" : item.unitPrice}
-            onFocus={(e) => {
-              if (item.unitPrice === 0) e.target.value = "";
-            }}
-            onBlur={(e) => {
-              if (e.target.value === "") {
-                handleNumberChange("unitPrice", 0);
-              }
-            }}
-            onChange={(e) =>
-              handleNumberChange("unitPrice", Number(e.target.value || 0))
-            }
-            onKeyDown={(e) => handleKeyDown(e, "unitPrice")}
-            className="h-10 w-full rounded-xl border border-gray-300 bg-white px-3 text-right outline-none focus:border-gray-900"
-          />
-        </div>
-
-        <div className="border-r border-gray-200 p-2">
-          <input
-            ref={(el) => registerInput(item.id, "supplyAmount", el)}
-            type="number"
-            value={item.supplyAmount === 0 ? "" : item.supplyAmount}
-            onFocus={(e) => {
-              if (item.supplyAmount === 0) e.target.value = "";
-            }}
-            onBlur={(e) => {
-              if (e.target.value === "") {
-                handleNumberChange("supplyAmount", 0);
-              }
-            }}
-            onChange={(e) =>
-              handleNumberChange("supplyAmount", Number(e.target.value || 0))
-            }
-            onKeyDown={(e) => handleKeyDown(e, "supplyAmount")}
-            className="h-10 w-full rounded-xl border border-gray-300 bg-white px-3 text-right outline-none focus:border-gray-900"
-          />
-        </div>
-
-        <div className="border-r border-gray-200 p-2">
-          <div className="flex h-10 items-center justify-end rounded-xl border border-gray-200 bg-gray-100 px-3 text-[13px] text-gray-700">
-            {formatNumber(item.taxAmount)}
-          </div>
-        </div>
-
-        <div className="flex items-center justify-center gap-2 p-2">
-          <button
-            onClick={handleDuplicate}
-            className="rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-[12px] font-semibold text-gray-700"
-          >
-            복제
-          </button>
-          <button
-            onClick={handleRemove}
-            className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-600"
-          >
-            삭제
-          </button>
-        </div>
+  return (
+    <div className="grid grid-cols-[54px_64px_64px_64px_minmax(220px,2.1fr)_minmax(130px,1fr)_90px_100px_140px_150px_140px_140px]">
+      <div className="flex h-11 items-center justify-center border-r border-b border-gray-200 bg-white">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={() => onToggleSelect(item.id)}
+          className="h-4 w-4"
+        />
       </div>
-    );
-  },
-  (prev, next) => {
-    return (
-      prev.item === next.item &&
-      prev.index === next.index &&
-      prev.isSelected === next.isSelected &&
-      prev.onToggleSelect === next.onToggleSelect &&
-      prev.onChange === next.onChange &&
-      prev.onRemove === next.onRemove &&
-      prev.onDuplicate === next.onDuplicate &&
-      prev.registerInput === next.registerInput &&
-      prev.onCellNavigate === next.onCellNavigate
-    );
-  }
-);
 
-type ItemTableProps = {
-  items: StatementItem[];
-  selectedRowIds: string[];
-  vatMode: VatMode;
-  onToggleSelect: (id: string) => void;
-  onSelectAll: () => void;
-  onClearSelection: () => void;
-  onDeleteSelected: () => void;
-  onDuplicateSelected: () => void;
-  onMoveSelectedUp: () => void;
-  onMoveSelectedDown: () => void;
-  onChange: (
-    id: string,
-    key: keyof StatementItem,
-    value: string | number
-  ) => void;
-  onRemove: (id: string) => void;
-  onDuplicate: (id: string) => void;
-  onAdd: () => void;
-  registerInput: (
-    itemId: string,
-    field: EditableField,
-    el: HTMLInputElement | null
-  ) => void;
-  onCellNavigate: (
-    rowIndex: number,
-    field: EditableField,
-    action: "enter" | "up" | "down" | "left" | "right" | "tab" | "shiftTab"
-  ) => void;
-  onPasteRows: (text: string) => void;
-};
+      <input
+        ref={(el) => registerInput(item.id, "dateYear", el)}
+        value={yearValue}
+        onChange={(e) => onChange(item.id, "dateYear", e.target.value)}
+        onKeyDown={handleKeyDown("dateYear")}
+        placeholder="년"
+        className={centerClassName}
+      />
 
+      <input
+        ref={(el) => registerInput(item.id, "dateMonth", el)}
+        value={monthValue}
+        onChange={(e) => onChange(item.id, "dateMonth", e.target.value)}
+        onKeyDown={handleKeyDown("dateMonth")}
+        placeholder="월"
+        className={centerClassName}
+      />
+
+      <input
+        ref={(el) => registerInput(item.id, "dateDay", el)}
+        value={dayValue}
+        onChange={(e) => onChange(item.id, "dateDay", e.target.value)}
+        onKeyDown={handleKeyDown("dateDay")}
+        placeholder="일"
+        className={centerClassName}
+      />
+
+      <input
+        ref={(el) => registerInput(item.id, "productName", el)}
+        value={productNameValue}
+        onChange={(e) => onChange(item.id, "productName", e.target.value)}
+        onKeyDown={handleKeyDown("productName")}
+        placeholder="품목명"
+        className={inputBaseClassName}
+      />
+
+      <input
+        ref={(el) => registerInput(item.id, "spec", el)}
+        value={specValue}
+        onChange={(e) => onChange(item.id, "spec", e.target.value)}
+        onKeyDown={handleKeyDown("spec")}
+        placeholder="규격"
+        className={inputBaseClassName}
+      />
+
+      <input
+        ref={(el) => registerInput(item.id, "unit", el)}
+        value={unitValue}
+        onChange={(e) => onChange(item.id, "unit", e.target.value)}
+        onKeyDown={handleKeyDown("unit")}
+        placeholder="단위"
+        className={centerClassName}
+      />
+
+      <input
+        ref={(el) => registerInput(item.id, "quantity", el)}
+        value={quantityValue}
+        onChange={(e) => onChange(item.id, "quantity", e.target.value)}
+        onKeyDown={handleKeyDown("quantity")}
+        placeholder="수량"
+        inputMode="numeric"
+        className={rightClassName}
+      />
+
+      <input
+        ref={(el) => registerInput(item.id, "unitPrice", el)}
+        value={unitPriceValue}
+        onChange={(e) => onChange(item.id, "unitPrice", e.target.value)}
+        onKeyDown={handleKeyDown("unitPrice")}
+        placeholder={vatMode === "included" ? "단가(VAT포함)" : "단가(VAT별도)"}
+        inputMode="numeric"
+        className={rightClassName}
+      />
+
+      <input
+        ref={(el) => registerInput(item.id, "supplyAmount", el)}
+        value={supplyAmountValue}
+        onChange={(e) => onChange(item.id, "supplyAmount", e.target.value)}
+        onKeyDown={handleKeyDown("supplyAmount")}
+        placeholder="공급가액"
+        inputMode="numeric"
+        className={rightClassName}
+      />
+
+      <input
+        value={taxAmountValue}
+        onChange={() => {}}
+        readOnly
+        placeholder="세액"
+        className={`${rightClassName} bg-gray-50`}
+      />
+
+      <div className="flex h-11 items-center justify-center gap-2 border-b border-gray-200 bg-white px-2">
+        <button
+          type="button"
+          onClick={() => onDuplicate(item.id)}
+          className="rounded-lg border border-gray-300 px-2 py-1 text-[11px] text-gray-700"
+        >
+          복제
+        </button>
+        <button
+          type="button"
+          onClick={() => onRemove(item.id)}
+          className="rounded-lg border border-red-200 px-2 py-1 text-[11px] text-red-600"
+        >
+          삭제
+        </button>
+      </div>
+    </div>
+  );
+});
 const ItemTable = memo(function ItemTable({
   items,
   selectedRowIds,
@@ -2017,12 +1506,9 @@ const ItemTable = memo(function ItemTable({
   onClearSelection,
   onDeleteSelected,
   onDuplicateSelected,
-  onMoveSelectedUp,
-  onMoveSelectedDown,
   onChange,
   onRemove,
   onDuplicate,
-  onAdd,
   registerInput,
   onCellNavigate,
   onPasteRows,
@@ -2048,14 +1534,14 @@ const ItemTable = memo(function ItemTable({
       <div className="border-b border-gray-200 px-4 py-3">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <h2 className="text-[16px] font-semibold text-gray-900">품목 정보</h2>
-            <p className="mt-1 text-[12px] text-gray-500">
-              단가 또는 공급가액 중 편한 방식으로 입력할 수 있습니다.
+            <p className="text-[12px] text-gray-500">
+              견적서와 동일하게 Tab / Enter / 방향키 이동, 자동 행 추가, 붙여넣기를 지원합니다.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
             <button
+              type="button"
               onClick={onSelectAll}
               className={`rounded-2xl border px-4 py-2 text-[13px] font-medium ${
                 allSelected
@@ -2065,41 +1551,29 @@ const ItemTable = memo(function ItemTable({
             >
               전체 선택
             </button>
+
             <button
+              type="button"
               onClick={onClearSelection}
               className="rounded-2xl border border-gray-300 bg-white px-4 py-2 text-[13px] font-medium text-gray-800"
             >
               선택 해제
             </button>
+
             <button
+              type="button"
               onClick={onDeleteSelected}
               className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-[13px] font-medium text-red-600"
             >
               선택 행 삭제
             </button>
+
             <button
+              type="button"
               onClick={onDuplicateSelected}
               className="rounded-2xl border border-gray-300 bg-white px-4 py-2 text-[13px] font-medium text-gray-800"
             >
               선택 복제
-            </button>
-            <button
-              onClick={onMoveSelectedUp}
-              className="rounded-2xl border border-gray-300 bg-white px-4 py-2 text-[13px] font-medium text-gray-800"
-            >
-              ▲ 위로
-            </button>
-            <button
-              onClick={onMoveSelectedDown}
-              className="rounded-2xl border border-gray-300 bg-white px-4 py-2 text-[13px] font-medium text-gray-800"
-            >
-              ▼ 아래로
-            </button>
-            <button
-              onClick={onAdd}
-              className="rounded-2xl bg-gray-900 px-4 py-2 text-[13px] font-medium text-white"
-            >
-              행 추가
             </button>
           </div>
         </div>
@@ -2146,7 +1620,9 @@ const ItemTable = memo(function ItemTable({
             <div className="flex h-11 items-center justify-center border-r border-gray-200">
               세액
             </div>
-            <div className="flex h-11 items-center justify-center">작업</div>
+            <div className="flex h-11 items-center justify-center">
+              작업
+            </div>
           </div>
 
           <div className="max-h-[540px] overflow-y-auto">
@@ -2155,6 +1631,7 @@ const ItemTable = memo(function ItemTable({
                 key={item.id}
                 item={item}
                 index={index}
+                vatMode={vatMode}
                 isSelected={selectedRowIds.includes(item.id)}
                 onToggleSelect={onToggleSelect}
                 onChange={onChange}
@@ -2172,207 +1649,6 @@ const ItemTable = memo(function ItemTable({
             ) : null}
           </div>
         </div>
-      </div>
-    </div>
-  );
-});
-
-type StatementPrintPageProps = {
-  pageIndex: number;
-  totalPages: number;
-  pageRows: StatementItem[];
-  receiver: ClientData;
-  supplier: SupplierData;
-  vatMode: VatMode;
-  totalSupplyAmount: number;
-  totalTaxAmount: number;
-  totalAmount: number;
-  unpaidAmount: number;
-  receiverSigner: string;
-  supplierSigner: string;
-  companySettings: CompanySettings;
-  notes: string;
-  statementNumber: string;
-  statementDate: string;
-  setPageRef: (index: number, el: HTMLDivElement | null) => void;
-};
-
-const StatementPrintPage = memo(function StatementPrintPage({
-  pageIndex,
-  totalPages,
-  pageRows,
-  receiver,
-  supplier,
-  vatMode,
-  totalSupplyAmount,
-  totalTaxAmount,
-  totalAmount,
-  unpaidAmount,
-  receiverSigner,
-  supplierSigner,
-  companySettings,
-  notes,
-  statementNumber,
-  statementDate,
-  setPageRef,
-}: StatementPrintPageProps) {
-  const pageColor = pageIndex % 2 === 0 ? "#4b65ff" : "#ff6b6b";
-  const titleNote =
-    pageIndex % 2 === 0 ? "공급받는자 보관용" : "공급자 보관용";
-  const border = `1px dashed ${pageColor}55`;
-
-  return (
-    <div
-      ref={(el) => setPageRef(pageIndex, el)}
-      className="relative overflow-hidden bg-white"
-      style={{
-        width: `${EXPORT_PAGE_WIDTH}px`,
-        height: `${EXPORT_PAGE_HEIGHT}px`,
-        fontFamily: "Arial, 'Malgun Gothic', sans-serif",
-        boxSizing: "border-box",
-      }}
-    >
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          backgroundColor: "#ffffff",
-          padding: "10px 10px 8px",
-          boxSizing: "border-box",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "flex-start",
-          alignItems: "stretch",
-          gap: "8px",
-        }}
-      >
-        <SlipPreview
-          color={pageColor}
-          titleNote={titleNote}
-          receiver={receiver}
-          supplier={supplier}
-          previewRows={pageRows}
-          vatMode={vatMode}
-          totalSupplyAmount={totalSupplyAmount}
-          totalTaxAmount={totalTaxAmount}
-          totalAmount={totalAmount}
-          unpaidAmount={unpaidAmount}
-          receiverSigner={receiverSigner}
-          supplierSigner={supplierSigner}
-          companySettings={companySettings}
-        />
-
-        <table
-          style={{
-            width: "100%",
-            tableLayout: "fixed",
-            borderCollapse: "collapse",
-            backgroundColor: "#ffffff",
-            border: border,
-          }}
-        >
-          <colgroup>
-            <col style={{ width: "88px" }} />
-            <col style={{ width: "220px" }} />
-            <col style={{ width: "88px" }} />
-            <col style={{ width: "160px" }} />
-            <col style={{ width: "70px" }} />
-            <col style={{ width: "calc(100% - 626px)" }} />
-          </colgroup>
-          <tbody>
-            <tr>
-              <PdfCell
-                height={28}
-                fontSize={12}
-                fontWeight={700}
-                color={pageColor}
-                padding="0 10px"
-                borderRight={border}
-                borderBottom={border}
-                whiteSpace="nowrap"
-              >
-                명세서 번호
-              </PdfCell>
-              <PdfCell
-                height={28}
-                fontSize={12}
-                padding="0 10px"
-                borderRight={border}
-                borderBottom={border}
-                whiteSpace="nowrap"
-              >
-                {statementNumber || ""}
-              </PdfCell>
-              <PdfCell
-                height={28}
-                fontSize={12}
-                fontWeight={700}
-                color={pageColor}
-                padding="0 10px"
-                borderRight={border}
-                borderBottom={border}
-                whiteSpace="nowrap"
-              >
-                작성일
-              </PdfCell>
-              <PdfCell
-                height={28}
-                fontSize={12}
-                padding="0 10px"
-                borderRight={border}
-                borderBottom={border}
-                whiteSpace="nowrap"
-              >
-                {statementDate || ""}
-              </PdfCell>
-              <PdfCell
-                height={28}
-                fontSize={12}
-                fontWeight={700}
-                color={pageColor}
-                padding="0 10px"
-                borderRight={border}
-                borderBottom={border}
-                whiteSpace="nowrap"
-              >
-                페이지
-              </PdfCell>
-              <PdfCell
-                height={28}
-                fontSize={12}
-                padding="0 10px"
-                borderBottom={border}
-                whiteSpace="nowrap"
-              >
-                {pageIndex + 1} / {totalPages}
-              </PdfCell>
-            </tr>
-
-            <tr>
-              <PdfCell
-                height={36}
-                fontSize={12}
-                fontWeight={700}
-                color={pageColor}
-                padding="0 10px"
-                borderRight={border}
-                whiteSpace="nowrap"
-              >
-                비고
-              </PdfCell>
-              <PdfCell
-                height={36}
-                colSpan={5 as any}
-                fontSize={12}
-                padding="0 10px"
-                whiteSpace="pre-line"
-                lineHeight={1.25}
-              >
-                {notes || ""}
-              </PdfCell>
-            </tr>
-          </tbody>
-        </table>
       </div>
     </div>
   );
@@ -2419,11 +1695,10 @@ export default function StatementPage() {
   const [supplierSigner, setSupplierSigner] = useState("");
   const [items, setItems] = useState<StatementItem[]>([
     makeItem(todayString()),
-    makeItem(todayString()),
-    makeItem(todayString()),
+
   ]);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
-  const [notes, setNotes] = useState("상기와 같이 거래명세 내역을 확인드립니다.");
+  const [notes, setNotes] = useState("");
   const [unpaidAmount, setUnpaidAmount] = useState(0);
 
   const [companySettings, setCompanySettings] = useState<CompanySettings>({});
@@ -2432,21 +1707,18 @@ export default function StatementPage() {
   const [clientSearch, setClientSearch] = useState("");
   const [showClientSearch, setShowClientSearch] = useState(false);
 
-  const requestFocus = useCallback(
-    (rowIndex: number, field: EditableField) => {
-      const targetItem = itemsRef.current[rowIndex];
-      if (!targetItem) return;
+  const requestFocus = useCallback((rowIndex: number, field: EditableField) => {
+    const targetItem = itemsRef.current[rowIndex];
+    if (!targetItem) return;
 
-      const key = `${targetItem.id}-${field}`;
-      requestAnimationFrame(() => {
-        const target = inputRefs.current[key];
-        if (!target) return;
-        target.focus();
-        target.select();
-      });
-    },
-    []
-  );
+    const key = `${targetItem.id}-${field}`;
+    requestAnimationFrame(() => {
+      const target = inputRefs.current[key];
+      if (!target) return;
+      target.focus();
+      target.select();
+    });
+  }, []);
 
   useEffect(() => {
     itemsRef.current = items;
@@ -2475,6 +1747,7 @@ export default function StatementPage() {
       } catch {}
     }
 
+    setCompanySettings(nextCompanySettings);
     let nextClients: ClientRecord[] = [];
     const clientsRaw = localStorage.getItem(STORAGE_KEYS.clients);
     if (clientsRaw) {
@@ -2492,35 +1765,56 @@ export default function StatementPage() {
       } catch {}
     }
 
+    let estimateDraft: EstimateDraft | null = null;
+    const estimateDraftRaw = localStorage.getItem(STORAGE_KEYS.estimateDraft);
+    if (estimateDraftRaw) {
+      try {
+        estimateDraft = JSON.parse(estimateDraftRaw);
+      } catch {}
+    }
+
     const nextReceiver: ClientData = selectedClient
       ? toReceiverFromClient(selectedClient)
       : {
-          companyName: "",
-          managerName: "",
-          phone: "",
-          email: "",
+          companyName: estimateDraft?.clientName || "",
+          managerName: estimateDraft?.contactPerson || "",
+          phone: estimateDraft?.phone || "",
+          email: estimateDraft?.email || "",
           address: "",
           fax: "",
           businessNumber: "",
           memo: "",
         };
 
-    const nextSupplier: SupplierData = {
-      companyName: nextCompanySettings.companyName || "",
-      ceoName: nextCompanySettings.ceoName || "",
-      businessNumber: nextCompanySettings.businessNumber || "",
-      address: nextCompanySettings.address || "",
-      phone: nextCompanySettings.phone || "",
-      fax: nextCompanySettings.fax || "",
-    };
+const nextSupplier: SupplierData = {
+  companyName: nextCompanySettings.companyName || "",
+  ceoName: nextCompanySettings.ceo || "",
+  businessNumber: nextCompanySettings.businessNumber || "",
+  address: nextCompanySettings.address || "",
+  phone: nextCompanySettings.phone || "",
+  fax: nextCompanySettings.fax || "",
+};
 
-    const nextReceiverSigner = selectedClient?.owner || "";
-    const nextSupplierSigner = nextCompanySettings.ceoName || "";
-    const nextItems = [
-      makeItem(initialDate),
-      makeItem(initialDate),
-      makeItem(initialDate),
-    ];
+    const nextReceiverSigner =
+      selectedClient?.owner || estimateDraft?.contactPerson || "";
+const nextSupplierSigner = nextCompanySettings.ceo || "";
+
+    const draftItems =
+      estimateDraft?.items?.length && estimateDraft.items.length > 0
+        ? estimateDraft.items.map((draftItem) =>
+            sanitizeLoadedItem(
+              {
+                productName: draftItem.productName || "",
+                quantity: Math.max(1, parseNumber(draftItem.quantity || 1)),
+                unitPrice: parseNumber(
+                  draftItem.unitPrice ?? draftItem.supplyPrice ?? 0
+                ),
+              },
+              "included",
+              initialDate
+            )
+          )
+        : [makeItem(initialDate)];
 
     setCompanySettings(nextCompanySettings);
 
@@ -2536,9 +1830,10 @@ export default function StatementPage() {
     setSupplier(nextSupplier);
     setReceiverSigner(nextReceiverSigner);
     setSupplierSigner(nextSupplierSigner);
-    setItems(nextItems);
+    setItems(draftItems);
     setStatementId(crypto.randomUUID());
     setStatementNumber(makeStatementNumber(initialDate));
+    setNotes("");
     setMounted(true);
   }, []);
 
@@ -2590,16 +1885,11 @@ export default function StatementPage() {
   const deferredSupplier = useDeferredValue(supplier);
   const deferredPreviewPages = useDeferredValue(previewPages);
   const deferredVatMode = useDeferredValue(vatMode);
-  const deferredTotalSupplyAmount = useDeferredValue(totalSupplyAmount);
-  const deferredTotalTaxAmount = useDeferredValue(totalTaxAmount);
   const deferredTotalAmount = useDeferredValue(totalAmount);
   const deferredUnpaidAmount = useDeferredValue(unpaidAmount);
   const deferredReceiverSigner = useDeferredValue(receiverSigner);
   const deferredSupplierSigner = useDeferredValue(supplierSigner);
-  const deferredCompanySettings = useDeferredValue(companySettings);
   const deferredNotes = useDeferredValue(notes);
-  const deferredStatementNumber = useDeferredValue(statementNumber);
-  const deferredStatementDate = useDeferredValue(statementDate);
 
   const syncSavedStatements = useCallback((next: SavedStatement[]) => {
     setSavedStatements(next);
@@ -2628,9 +1918,9 @@ export default function StatementPage() {
     setItems((prev) =>
       prev.map((item) => ({
         ...item,
-        dateYear: year,
-        dateMonth: month,
-        dateDay: day,
+        dateYear: year.slice(-2),
+        dateMonth: String(Number(month) || ""),
+        dateDay: String(Number(day) || ""),
       }))
     );
   }, []);
@@ -2736,28 +2026,40 @@ export default function StatementPage() {
     setSelectedRowIds([]);
   }, []);
 
-  const deleteSelectedRows = useCallback(() => {
-    const currentItems = itemsRef.current;
-    if (selectedRowIds.length === 0) {
-      alert("선택된 행이 없습니다.");
-      return;
-    }
+const deleteSelectedRows = useCallback(() => {
+  const currentItems = itemsRef.current;
+  if (selectedRowIds.length === 0) {
+    alert("선택된 행이 없습니다.");
+    return;
+  }
 
-    const ok = window.confirm(
-      `선택된 ${selectedRowIds.length}개 행을 삭제하시겠습니까?`
-    );
-    if (!ok) return;
+  const ok = window.confirm(
+    `선택된 ${selectedRowIds.length}개 행을 삭제하시겠습니까?`
+  );
+  if (!ok) return;
 
-    const next = currentItems.filter((item) => !selectedRowIds.includes(item.id));
+  const next = currentItems.filter((item) => !selectedRowIds.includes(item.id));
 
-    if (next.length === 0) {
-      setItems([makeItem(statementDateRef.current)]);
-    } else {
-      setItems(next);
-    }
+  if (next.length === 0) {
+    setItems([makeItem(statementDateRef.current)]);
+  } else {
+    setItems(next);
+  }
 
-    setSelectedRowIds([]);
-  }, [selectedRowIds]);
+  setSelectedRowIds([]);
+}, [selectedRowIds]);
+
+const resetItemsOnly = useCallback(() => {
+  const ok = window.confirm("품목 정보만 초기화하시겠습니까?");
+  if (!ok) return;
+
+  setItems([
+    makeItem(statementDateRef.current),
+
+  ]);
+
+  setSelectedRowIds([]);
+}, []);
 
   const duplicateSelectedRows = useCallback(() => {
     if (selectedRowIds.length === 0) {
@@ -2786,45 +2088,6 @@ export default function StatementPage() {
     setSelectedRowIds([]);
   }, [selectedRowIds]);
 
-  const moveSelectedRowsUp = useCallback(() => {
-    if (selectedRowIds.length === 0) {
-      alert("선택된 행이 없습니다.");
-      return;
-    }
-
-    setItems((prev) => {
-      const next = [...prev];
-      const selectedSet = new Set(selectedRowIds);
-
-      for (let i = 1; i < next.length; i++) {
-        if (selectedSet.has(next[i].id) && !selectedSet.has(next[i - 1].id)) {
-          [next[i - 1], next[i]] = [next[i], next[i - 1]];
-        }
-      }
-
-      return next;
-    });
-  }, [selectedRowIds]);
-
-  const moveSelectedRowsDown = useCallback(() => {
-    if (selectedRowIds.length === 0) {
-      alert("선택된 행이 없습니다.");
-      return;
-    }
-
-    setItems((prev) => {
-      const next = [...prev];
-      const selectedSet = new Set(selectedRowIds);
-
-      for (let i = next.length - 2; i >= 0; i--) {
-        if (selectedSet.has(next[i].id) && !selectedSet.has(next[i + 1].id)) {
-          [next[i], next[i + 1]] = [next[i + 1], next[i]];
-        }
-      }
-
-      return next;
-    });
-  }, [selectedRowIds]);
 
   const registerInput = useCallback(
     (itemId: string, field: EditableField, el: HTMLInputElement | null) => {
@@ -2931,33 +2194,39 @@ export default function StatementPage() {
     setReceiverSigner("");
   }, []);
 
-  const resetForm = useCallback(() => {
-    const nextDate = todayString();
-    statementDateRef.current = nextDate;
-    vatModeRef.current = "included";
+const resetForm = useCallback(() => {
+  const nextDate = todayString();
+  statementDateRef.current = nextDate;
+  vatModeRef.current = "included";
 
-    setStatementId(crypto.randomUUID());
-    setStatementNumber(makeStatementNumber(nextDate));
-    setStatementDate(nextDate);
-    setVatMode("included");
-    clearSelectedClientInForm();
-    setSupplier({
-      companyName: companySettings.companyName || "",
-      ceoName: companySettings.ceoName || "",
-      businessNumber: companySettings.businessNumber || "",
-      address: companySettings.address || "",
-      phone: companySettings.phone || "",
-      fax: companySettings.fax || "",
-    });
-    setSupplierSigner(companySettings.ceoName || "");
-    setItems([makeItem(nextDate), makeItem(nextDate), makeItem(nextDate)]);
-    setSelectedRowIds([]);
-    setNotes("상기와 같이 거래명세 내역을 확인드립니다.");
-    setUnpaidAmount(0);
-    setClientSearch("");
-    setShowClientSearch(false);
-  }, [clearSelectedClientInForm, companySettings]);
+  setStatementId(crypto.randomUUID());
+  setStatementNumber(makeStatementNumber(nextDate));
+  setStatementDate(nextDate);
+  setVatMode("included");
+  clearSelectedClientInForm();
 
+  setSupplier({
+    companyName: companySettings.companyName || "",
+    ceoName: companySettings.ceo || "",
+    businessNumber: companySettings.businessNumber || "",
+    address: companySettings.address || "",
+    phone: companySettings.phone || "",
+    fax: companySettings.fax || "",
+  });
+
+  setSupplierSigner(companySettings.ceo || "");
+
+  setItems([
+    makeItem(nextDate),
+
+  ]);
+
+  setSelectedRowIds([]);
+  setNotes("");
+  setUnpaidAmount(0);
+  setClientSearch("");
+  setShowClientSearch(false);
+}, [clearSelectedClientInForm, companySettings]);
   const saveStatement = useCallback(() => {
     const payload: SavedStatement = {
       id: statementId || crypto.randomUUID(),
@@ -3052,7 +2321,7 @@ export default function StatementPage() {
     setSupplier(safeSupplier);
     setItems(safeItems);
     setSelectedRowIds([]);
-    setNotes(data.notes || "상기와 같이 거래명세 내역을 확인드립니다.");
+    setNotes(data.notes || "");
     setUnpaidAmount(parseNumber(data.unpaidAmount || 0));
     setReceiverSigner(data.receiverSigner || safeReceiver.managerName || "");
     setSupplierSigner(data.supplierSigner || safeSupplier.ceoName || "");
@@ -3083,7 +2352,7 @@ export default function StatementPage() {
     const canvases = [];
     for (const node of nodes) {
       const canvas = await html2canvas(node, {
-        scale: 3,
+        scale: 2,
         useCORS: true,
         backgroundColor: "#ffffff",
         scrollX: 0,
@@ -3144,65 +2413,69 @@ export default function StatementPage() {
   }, [createPdfBlob, statementNumber]);
 
   const handlePrint = useCallback(async () => {
-    const blob = await createPdfBlob();
-    const url = URL.createObjectURL(blob);
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.right = "0";
-    iframe.style.bottom = "0";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
-    iframe.style.border = "0";
-    iframe.src = url;
-    document.body.appendChild(iframe);
+    try {
+      if (typeof window === "undefined") return;
 
-    iframe.onload = () => {
-      setTimeout(() => {
-        try {
-          iframe.contentWindow?.focus();
-          iframe.contentWindow?.print();
-        } finally {
-          setTimeout(() => {
-            document.body.removeChild(iframe);
-            URL.revokeObjectURL(url);
-          }, 1000);
-        }
-      }, 300);
-    };
+      const pdfBlob = await createPdfBlob();
+      const url = URL.createObjectURL(pdfBlob);
+      const iframe = document.createElement("iframe");
+
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      iframe.src = url;
+
+      iframe.onload = () => {
+        setTimeout(() => {
+          try {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+          } finally {
+            setTimeout(() => {
+              document.body.removeChild(iframe);
+              URL.revokeObjectURL(url);
+            }, 1000);
+          }
+        }, 300);
+      };
+
+      document.body.appendChild(iframe);
+    } catch (error) {
+      console.error("인쇄 실패:", error);
+      alert("인쇄 중 오류가 발생했습니다.");
+    }
   }, [createPdfBlob]);
 
-  const handleSendEmail = useCallback(() => {
-    const vatLabel = vatMode === "included" ? "VAT 포함" : "VAT 별도";
-    const subject = encodeURIComponent(`[거래명세서] ${statementNumber}`);
-    const body = encodeURIComponent(
-      [
-        `거래명세서 번호: ${statementNumber}`,
-        `작성일: ${statementDate}`,
-        `거래처: ${receiver.companyName}`,
-        `VAT 구분: ${vatLabel}`,
-        `공급가액: ${formatNumber(totalSupplyAmount)}원`,
-        `세액: ${formatNumber(totalTaxAmount)}원`,
-        `합계금액: ${formatNumber(totalAmount)}원`,
-        `미수금: ${formatNumber(unpaidAmount)}원`,
+  const handleSendEmail = useCallback(async () => {
+    try {
+      if (typeof window === "undefined") return;
+
+      const subject = encodeURIComponent(
+        `거래명세서 ${statementNumber || ""}`.trim()
+      );
+
+      const bodyLines = [
+        "안녕하세요.",
         "",
-        "원프앤에서 작성된 거래명세서입니다.",
-      ].join("\n")
-    );
+        `거래명세서 번호: ${statementNumber || "-"}`,
+        `작성일: ${statementDate || "-"}`,
+        `거래처: ${receiver.companyName || "-"}`,
+        "",
+        "거래명세서를 확인해주세요.",
+      ];
 
-    window.location.href = `mailto:${receiver.email || ""}?subject=${subject}&body=${body}`;
-  }, [
-    receiver.companyName,
-    receiver.email,
-    statementDate,
-    statementNumber,
-    totalAmount,
-    totalSupplyAmount,
-    totalTaxAmount,
-    unpaidAmount,
-    vatMode,
-  ]);
+      const body = encodeURIComponent(bodyLines.join("\n"));
+      window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    } catch (error) {
+      console.error("이메일 발송 실패:", error);
+      alert("이메일 발송 중 오류가 발생했습니다.");
+    }
+  }, [receiver.companyName, statementDate, statementNumber]);
 
-  if (!mounted) {
+    if (!mounted) {
     return (
       <div className="p-8">
         <div className="rounded-2xl border border-gray-200 bg-white p-8 text-sm text-gray-500">
@@ -3214,13 +2487,14 @@ export default function StatementPage() {
 
   return (
     <div className="min-h-screen bg-[#f3f5f8] px-4 py-4 xl:px-5 xl:py-5">
+
+
       <div className="mx-auto grid max-w-[2360px] grid-cols-1 gap-5 xl:grid-cols-[980px_minmax(0,1fr)]">
         <div className="space-y-4">
           <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-4 shadow-sm">
             <h1 className="text-[19px] font-bold text-gray-900">거래명세서</h1>
             <p className="mt-1 text-[12px] text-gray-500">
-              유통단가표처럼 넓은 작업창과 표 기반 품목 입력으로 정리한 실무형
-              거래명세서입니다.
+              파랑+빨강이 한 장으로 출력되는 거래명세서 기준 파일입니다.
             </p>
           </div>
 
@@ -3231,8 +2505,7 @@ export default function StatementPage() {
                   거래처 선택
                 </h2>
                 <p className="mt-1 text-[12px] text-gray-500">
-                  거래처 관리에 저장된 업체를 검색하고 선택하면 공급받는자 정보에
-                  자동 반영됩니다.
+                  저장된 거래처를 선택하면 공급받는자 정보에 자동 반영됩니다.
                 </p>
               </div>
 
@@ -3434,7 +2707,7 @@ export default function StatementPage() {
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <label className="block">
                   <span className="mb-1.5 block text-[12px] font-medium text-gray-700">
-                    상호(법인명)
+                    상호명
                   </span>
                   <input
                     value={receiver.companyName}
@@ -3447,7 +2720,7 @@ export default function StatementPage() {
 
                 <label className="block">
                   <span className="mb-1.5 block text-[12px] font-medium text-gray-700">
-                    등록번호
+                    사업자번호
                   </span>
                   <input
                     value={receiver.businessNumber || ""}
@@ -3461,7 +2734,7 @@ export default function StatementPage() {
 
               <label className="block">
                 <span className="mb-1.5 block text-[12px] font-medium text-gray-700">
-                  사업장 주소
+                  사업장주소
                 </span>
                 <input
                   value={receiver.address || ""}
@@ -3470,7 +2743,7 @@ export default function StatementPage() {
                 />
               </label>
 
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <label className="block">
                   <span className="mb-1.5 block text-[12px] font-medium text-gray-700">
                     성명
@@ -3484,7 +2757,7 @@ export default function StatementPage() {
                   />
                 </label>
 
-                <label className="block md:col-span-2">
+                <label className="block">
                   <span className="mb-1.5 block text-[12px] font-medium text-gray-700">
                     전화번호
                   </span>
@@ -3506,17 +2779,6 @@ export default function StatementPage() {
                   />
                 </label>
               </div>
-
-              <label className="block">
-                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">
-                  이메일
-                </span>
-                <input
-                  value={receiver.email}
-                  onChange={(e) => handleReceiverChange("email", e.target.value)}
-                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
-                />
-              </label>
             </div>
           </div>
 
@@ -3529,7 +2791,7 @@ export default function StatementPage() {
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <label className="block">
                   <span className="mb-1.5 block text-[12px] font-medium text-gray-700">
-                    상호(법인명)
+                    상호명
                   </span>
                   <input
                     value={supplier.companyName}
@@ -3542,7 +2804,7 @@ export default function StatementPage() {
 
                 <label className="block">
                   <span className="mb-1.5 block text-[12px] font-medium text-gray-700">
-                    등록번호
+                    사업자번호
                   </span>
                   <input
                     value={supplier.businessNumber}
@@ -3556,11 +2818,13 @@ export default function StatementPage() {
 
               <label className="block">
                 <span className="mb-1.5 block text-[12px] font-medium text-gray-700">
-                  사업장 주소
+                  사업장주소
                 </span>
                 <input
                   value={supplier.address}
-                  onChange={(e) => handleSupplierChange("address", e.target.value)}
+                  onChange={(e) =>
+                    handleSupplierChange("address", e.target.value)
+                  }
                   className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
                 />
               </label>
@@ -3568,22 +2832,26 @@ export default function StatementPage() {
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <label className="block">
                   <span className="mb-1.5 block text-[12px] font-medium text-gray-700">
-                    대표자
+                    성명
                   </span>
                   <input
                     value={supplier.ceoName}
-                    onChange={(e) => handleSupplierChange("ceoName", e.target.value)}
+                    onChange={(e) =>
+                      handleSupplierChange("ceoName", e.target.value)
+                    }
                     className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
                   />
                 </label>
 
                 <label className="block">
                   <span className="mb-1.5 block text-[12px] font-medium text-gray-700">
-                    전화번호
+                    전화
                   </span>
                   <input
                     value={supplier.phone}
-                    onChange={(e) => handleSupplierChange("phone", e.target.value)}
+                    onChange={(e) =>
+                      handleSupplierChange("phone", e.target.value)
+                    }
                     className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
                   />
                 </label>
@@ -3594,145 +2862,157 @@ export default function StatementPage() {
                   </span>
                   <input
                     value={supplier.fax}
-                    onChange={(e) => handleSupplierChange("fax", e.target.value)}
+                    onChange={(e) =>
+                      handleSupplierChange("fax", e.target.value)
+                    }
                     className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
                   />
                 </label>
               </div>
-            </div>
-          </div>
 
-          <ItemTable
-            items={items}
-            selectedRowIds={selectedRowIds}
-            vatMode={vatMode}
-            onToggleSelect={toggleRowSelect}
-            onSelectAll={selectAllRows}
-            onClearSelection={clearSelection}
-            onDeleteSelected={deleteSelectedRows}
-            onDuplicateSelected={duplicateSelectedRows}
-            onMoveSelectedUp={moveSelectedRowsUp}
-            onMoveSelectedDown={moveSelectedRowsDown}
-            onChange={handleItemChange}
-            onRemove={removeItem}
-            onDuplicate={duplicateItem}
-            onAdd={addItem}
-            registerInput={registerInput}
-            onCellNavigate={onCellNavigate}
-            onPasteRows={handlePasteRows}
-          />
-
-          <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-5 shadow-sm">
-            <h2 className="mb-3 text-[16px] font-semibold text-gray-900">
-              정리 정보
-            </h2>
-
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <label className="block">
                 <span className="mb-1.5 block text-[12px] font-medium text-gray-700">
-                  미수금
+                  비고
                 </span>
-                <input
-                  type="number"
-                  value={unpaidAmount === 0 ? "" : unpaidAmount}
-                  onFocus={(e) => {
-                    if (unpaidAmount === 0) e.target.value = "";
-                  }}
-                  onBlur={(e) => {
-                    if (e.target.value === "") {
-                      setUnpaidAmount(0);
-                    }
-                  }}
-                  onChange={(e) => setUnpaidAmount(Number(e.target.value || 0))}
-                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-right text-[14px] outline-none focus:border-gray-900"
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={3}
+                  className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-[14px] outline-none focus:border-gray-900"
                 />
               </label>
-
-              <div className="rounded-[22px] border border-gray-200 bg-gray-50 p-4">
-                <div className="flex items-center justify-between py-1 text-[13px]">
-                  <span className="text-gray-500">공급가액</span>
-                  <span className="text-gray-900">{formatNumber(totalSupplyAmount)}원</span>
-                </div>
-                <div className="flex items-center justify-between py-1 text-[13px]">
-                  <span className="text-gray-500">세액</span>
-                  <span className="text-gray-900">{formatNumber(totalTaxAmount)}원</span>
-                </div>
-                <div className="mt-2 flex items-center justify-between border-t border-gray-200 pt-3">
-                  <span className="text-gray-800">
-                    {vatMode === "included"
-                      ? "합계금액(VAT 포함)"
-                      : "합계금액(VAT 별도)"}
-                  </span>
-                  <span className="text-[20px] text-gray-900">
-                    {formatNumber(totalAmount)}원
-                  </span>
-                </div>
-              </div>
             </div>
-
-            <label className="mt-3 block">
-              <span className="mb-1.5 block text-[12px] font-medium text-gray-700">
-                비고
-              </span>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={3}
-                className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-[14px] outline-none focus:border-gray-900"
-              />
-            </label>
           </div>
+<div className="rounded-[26px] border border-gray-200 bg-white px-5 py-5 shadow-sm">
 
+ <div className="mb-3 flex items-center justify-between">
+
+  {/* 좌측 */}
+  <div className="flex items-center gap-2">
+    <h2 className="text-[16px] font-semibold text-gray-900">
+      품목 정보
+    </h2>
+
+    <button
+      type="button"
+      onClick={resetItemsOnly}
+ className="inline-flex items-center justify-center h-7 px-3 rounded-full border border-orange-200 bg-orange-50 text-[10px] font-semibold tracking-[0.12em] text-orange-500"
+    >
+      RESET
+    </button>
+  </div>
+
+  {/* 우측 */}
+  <button
+    type="button"
+    onClick={addItem}
+    className="rounded-2xl bg-gray-900 px-4 py-2 text-[13px] text-white"
+  >
+    행 추가
+  </button>
+
+</div>
+
+  <ItemTable
+    items={items}
+    selectedRowIds={selectedRowIds}
+    vatMode={vatMode}
+    onToggleSelect={toggleRowSelect}
+    onSelectAll={selectAllRows}
+    onClearSelection={clearSelection}
+    onDeleteSelected={deleteSelectedRows}
+    onDuplicateSelected={duplicateSelectedRows}
+    onChange={handleItemChange}
+    onRemove={removeItem}
+    onDuplicate={duplicateItem}
+    registerInput={registerInput}
+    onCellNavigate={onCellNavigate}
+    onPasteRows={handlePasteRows}
+  />
+
+</div>
           <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-5 shadow-sm">
             <h2 className="mb-3 text-[16px] font-semibold text-gray-900">
-              저장 / 출력
+              금액 / 저장
             </h2>
 
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <div className="text-[12px] text-gray-500">공급가액</div>
+                <div className="mt-1 text-[20px] font-bold text-gray-900">
+                  {formatNumber(totalSupplyAmount)}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <div className="text-[12px] text-gray-500">세액</div>
+                <div className="mt-1 text-[20px] font-bold text-gray-900">
+                  {formatNumber(totalTaxAmount)}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <div className="text-[12px] text-gray-500">합계금액</div>
+                <div className="mt-1 text-[20px] font-bold text-gray-900">
+                  {formatNumber(totalAmount)}
+                </div>
+              </div>
+
+              <label className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <div className="text-[12px] text-gray-500">미수금</div>
+                <input
+                  value={unpaidAmount ? String(unpaidAmount) : ""}
+                  onChange={(e) => setUnpaidAmount(parseNumber(e.target.value))}
+                  placeholder="0"
+                  className="mt-1 w-full bg-transparent text-[20px] font-bold text-gray-900 outline-none"
+                />
+              </label>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
               <button
                 onClick={saveStatement}
-                className="rounded-2xl bg-gray-900 px-4 py-2.5 text-[13px] font-semibold text-white"
+                className="rounded-2xl bg-gray-900 px-4 py-2.5 text-[13px] font-medium text-white"
               >
                 거래명세서 저장
               </button>
               <button
                 onClick={handleSavePng}
-                className="rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-semibold text-gray-900"
+                className="rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-medium text-gray-800"
               >
                 PNG 저장
               </button>
               <button
                 onClick={handleSaveJpg}
-                className="rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-semibold text-gray-900"
+                className="rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-medium text-gray-800"
               >
                 JPG 저장
               </button>
               <button
                 onClick={handleSavePdf}
-                className="rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-semibold text-gray-900"
+                className="rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-medium text-gray-800"
               >
                 PDF 저장
               </button>
               <button
+                onClick={handleSendEmail}
+                className="rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-medium text-gray-800"
+              >
+                이메일 발송
+              </button>
+              <button
                 onClick={handlePrint}
-                className="rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-semibold text-gray-900"
+                className="rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-medium text-gray-800"
               >
                 인쇄
               </button>
               <button
-                onClick={handleSendEmail}
-                className="rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-semibold text-gray-900"
+                onClick={resetForm}
+                className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2.5 text-[13px] font-medium text-red-600"
               >
-                이메일 발송
+                새 거래명세서 작성
               </button>
             </div>
-
-            <button
-              onClick={resetForm}
-              className="mt-3 w-full rounded-2xl bg-red-50 px-4 py-2.5 text-[13px] font-semibold text-red-600"
-            >
-              새 거래명세서 작성
-            </button>
           </div>
 
           <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-5 shadow-sm">
@@ -3740,34 +3020,34 @@ export default function StatementPage() {
               저장된 거래명세서
             </h2>
 
-            <div className="space-y-3">
-              {savedStatements.length === 0 ? (
-                <div className="rounded-[22px] border border-dashed border-gray-300 p-6 text-[13px] text-gray-500">
-                  저장된 거래명세서가 없습니다.
-                </div>
-              ) : (
-                savedStatements.map((item) => (
+            {savedStatements.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-gray-300 p-6 text-center text-[13px] text-gray-500">
+                저장된 거래명세서가 없습니다.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {savedStatements.map((item) => (
                   <div
                     key={item.id}
-                    className="rounded-[22px] border border-gray-200 p-4"
+                    className="rounded-2xl border border-gray-200 bg-[#fbfbfc] p-4"
                   >
-                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                       <div>
-                        <p className="font-semibold text-gray-900">
+                        <div className="text-[15px] font-semibold text-gray-900">
                           {item.statementNumber}
-                        </p>
-                        <p className="mt-1 text-[13px] text-gray-500">
-                          거래처: {item.receiver.companyName || "-"}
-                        </p>
-                        <p className="mt-1 text-[13px] text-gray-500">
-                          합계금액: {formatNumber(item.totalAmount)}원
-                        </p>
+                        </div>
+                        <div className="mt-1 text-[13px] text-gray-600">
+                          {item.receiver.companyName || "-"} / {item.statementDate}
+                        </div>
+                        <div className="mt-1 text-[13px] text-gray-600">
+                          합계금액: {formatNumber(item.totalAmount)}
+                        </div>
                       </div>
 
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <button
                           onClick={() => loadStatement(item)}
-                          className="rounded-2xl bg-gray-900 px-4 py-2 text-[13px] font-medium text-white"
+                          className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2 text-[13px] font-medium text-blue-600"
                         >
                           불러오기
                         </button>
@@ -3780,48 +3060,41 @@ export default function StatementPage() {
                       </div>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="xl:sticky xl:top-5 xl:self-start">
-          <div className="rounded-[28px] border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between px-1">
-              <h2 className="text-[18px] font-semibold text-gray-900">
-                A4 미리보기
-              </h2>
-              <p className="text-[11px] text-gray-500">
-                파란 보관용 + 빨간 보관용
+        <div className="rounded-[26px] border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <h2 className="text-[16px] font-semibold text-gray-900">A4 미리보기</h2>
+              <p className="mt-1 text-[12px] text-gray-500">
+                A4 한 장 안에 위 파랑 / 아래 빨강이 함께 들어갑니다.
               </p>
             </div>
+          </div>
 
-            <div className="overflow-auto rounded-[22px] bg-[#edf1f6] p-3">
-              <div className="mx-auto flex w-full flex-col items-center gap-6">
-                {deferredPreviewPages.map((pageRows, pageIndex) => (
-                  <StatementPrintPage
-                    key={pageIndex}
-                    pageIndex={pageIndex}
-                    totalPages={deferredPreviewPages.length}
-                    pageRows={pageRows}
-                    receiver={deferredReceiver}
-                    supplier={deferredSupplier}
-                    vatMode={deferredVatMode}
-                    totalSupplyAmount={deferredTotalSupplyAmount}
-                    totalTaxAmount={deferredTotalTaxAmount}
-                    totalAmount={deferredTotalAmount}
-                    unpaidAmount={deferredUnpaidAmount}
-                    receiverSigner={deferredReceiverSigner}
-                    supplierSigner={deferredSupplierSigner}
-                    companySettings={deferredCompanySettings}
-                    notes={deferredNotes}
-                    statementNumber={deferredStatementNumber}
-                    statementDate={deferredStatementDate}
-                    setPageRef={setPageRef}
-                  />
-                ))}
-              </div>
+          <div className="h-[calc(100vh-96px)] overflow-auto rounded-[22px] border border-gray-200 bg-[#eef2f7] p-4">
+            <div className="flex flex-col items-center gap-8">
+              {deferredPreviewPages.map((page, index) => (
+                <StatementPagePreview
+                  key={index}
+                  pageIndex={index}
+                  pageRows={page}
+                  receiver={deferredReceiver}
+                  supplier={deferredSupplier}
+                  vatMode={deferredVatMode}
+                  totalAmount={deferredTotalAmount}
+                  unpaidAmount={deferredUnpaidAmount}
+                  receiverSigner={deferredReceiverSigner}
+                  supplierSigner={deferredSupplierSigner}
+                  notes={deferredNotes}
+                  companySettings={companySettings}
+                  setPageRef={setPageRef}
+                />
+              ))}
             </div>
           </div>
         </div>

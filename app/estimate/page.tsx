@@ -1224,46 +1224,19 @@ export default function EstimatePage() {
     setSelectedRowIds([]);
   };
 
-  const handleMoveSelectedUp = () => {
-    if (selectedRowIds.length === 0) {
-      alert("선택된 행이 없습니다.");
-      return;
-    }
 
-    setItems((prev) => {
-      const next = [...prev];
-      const selectedSet = new Set(selectedRowIds);
+const resetItemsOnly = () => {
+  const ok = window.confirm("품목 정보만 초기화하시겠습니까?");
+  if (!ok) return;
 
-      for (let i = 1; i < next.length; i++) {
-        if (selectedSet.has(next[i].id) && !selectedSet.has(next[i - 1].id)) {
-          [next[i - 1], next[i]] = [next[i], next[i - 1]];
-        }
-      }
+  setItems([
+    createEmptyLineItem(),
+    createEmptyLineItem(),
+    createEmptyLineItem(),
+  ]);
 
-      return next;
-    });
-  };
-
-  const handleMoveSelectedDown = () => {
-    if (selectedRowIds.length === 0) {
-      alert("선택된 행이 없습니다.");
-      return;
-    }
-
-    setItems((prev) => {
-      const next = [...prev];
-      const selectedSet = new Set(selectedRowIds);
-
-      for (let i = next.length - 2; i >= 0; i--) {
-        if (selectedSet.has(next[i].id) && !selectedSet.has(next[i + 1].id)) {
-          [next[i], next[i + 1]] = [next[i + 1], next[i]];
-        }
-      }
-
-      return next;
-    });
-  };
-
+  setSelectedRowIds([]);
+};
   useEffect(() => {
     setSelectedRowIds((prev) =>
       prev.filter((id) => items.some((item) => item.id === id))
@@ -2032,16 +2005,42 @@ export default function EstimatePage() {
           </div>
 
           <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-5 shadow-sm">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-[16px] font-semibold text-gray-900">품목 정보</h2>
-              <button
-                type="button"
-                onClick={handleAddItem}
-                className="rounded-2xl bg-gray-900 px-4 py-2 text-[13px] font-medium text-white"
-              >
-                품목 추가
-              </button>
-            </div>
+<div className="mb-3 flex items-center justify-between">
+  {/* 왼쪽: 제목 + RESET */}
+  <div className="flex items-center gap-2">
+    <h2 className="text-[16px] font-semibold text-gray-900">
+      품목 정보
+    </h2>
+
+    <button
+      type="button"
+      onClick={resetItemsOnly}
+      className="
+        inline-flex items-center justify-center
+        h-7 px-3
+        rounded-full
+        border border-orange-200
+        bg-orange-50
+        text-[10px] font-semibold tracking-[0.12em]
+        text-orange-500
+        transition
+        hover:bg-orange-100 hover:border-orange-300
+        active:scale-[0.97]
+      "
+    >
+      RESET
+    </button>
+  </div>
+
+  {/* 오른쪽: 행 추가 */}
+  <button
+    type="button"
+    onClick={handleAddItem}
+    className="rounded-2xl bg-gray-900 px-4 py-2 text-[13px] font-medium text-white"
+  >
+    행 추가
+  </button>
+</div>
 
             <div
               className="rounded-[24px] border border-gray-200 bg-[#fbfbfc]"
@@ -2089,18 +2088,7 @@ export default function EstimatePage() {
                     >
                       선택 복제
                     </button>
-                    <button
-                      onClick={handleMoveSelectedUp}
-                      className="rounded-2xl border border-gray-300 bg-white px-4 py-2 text-[13px] font-medium text-gray-800"
-                    >
-                      ▲ 위로
-                    </button>
-                    <button
-                      onClick={handleMoveSelectedDown}
-                      className="rounded-2xl border border-gray-300 bg-white px-4 py-2 text-[13px] font-medium text-gray-800"
-                    >
-                      ▼ 아래로
-                    </button>
+ 
                   </div>
                 </div>
 

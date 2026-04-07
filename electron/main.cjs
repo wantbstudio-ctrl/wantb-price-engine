@@ -81,6 +81,7 @@ async function createMainWindow() {
       sandbox: false,
     },
   });
+  mainWindow.webContents.openDevTools();
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);

@@ -9,7 +9,7 @@ type LayoutClientProps = {
 };
 
 const menuItems = [
-  { label: "Dashboard", sub: "대시보드", href: "/" },
+  { label: "Selling Price Calculator", sub: "판매가 계산기", href: "/" },
   { label: "Products", sub: "제품관리", href: "/products" },
   { label: "Estimate", sub: "견적서", href: "/estimate" },
   { label: "Statement", sub: "거래명세표", href: "/statement" },
@@ -27,7 +27,7 @@ export default function LayoutClient({ children }: LayoutClientProps) {
     <div className="flex min-h-screen bg-gray-100">
       <aside className="no-drag w-[260px] border-r border-gray-200 bg-white px-5 py-6">
         <div className="mb-10">
-          <h1 className="text-xl font-bold text-gray-900">원프앤</h1>
+          <h1 className="text-xl font-bold text-gray-900">원트비 프라이스 엔진</h1>
           <p className="mt-1 text-xs text-gray-400">WantB Price Engine</p>
         </div>
 

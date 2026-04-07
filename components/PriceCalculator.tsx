@@ -77,15 +77,15 @@ export default function PriceCalculator() {
       const parsed = JSON.parse(raw);
 
       // 기존 개별 비용 대신 totalCost 기준으로 세팅
-const total = Number(parsed?.totalCost ?? 0);
+      const total = Number(parsed?.totalCost ?? 0);
 
-setManufacturingCost(total);
-setPackageCost(0);
-setShippingCost(0);
-setAdCost(0);
-setStorageCost(0);
-setReturnCost(0);
-setDefectRate(0);
+      setManufacturingCost(total);
+      setPackageCost(0);
+      setShippingCost(0);
+      setAdCost(0);
+      setStorageCost(0);
+      setReturnCost(0);
+      setDefectRate(0);
 
       setPlatformFee(Number(parsed?.platformFee ?? 0));
       setMarginRate(Number(parsed?.marginRate ?? 0));
@@ -273,10 +273,8 @@ setDefectRate(0);
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_0.8fr]">
       <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="mt-2 text-sm text-gray-500">
-          원가와 수수료를 입력하면 채널별 판매가와 수익을 자동 계산합니다.
-        </p>
+        <h1 className="text-2xl font-bold text-gray-900">Selling Price Calculator</h1>
+        <p className="mt-2 text-sm text-gray-500">판매가 계산기</p>
 
         <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-2 md:col-span-2">
@@ -293,7 +291,7 @@ setDefectRate(0);
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">제조원가</label>
+            <label className="block text-sm font-medium text-gray-700">제조원가 (￦)</label>
             <div className="rounded-xl border border-gray-300 bg-white px-3">
               <input
                 type="number"
@@ -305,7 +303,7 @@ setDefectRate(0);
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">패키지비</label>
+            <label className="block text-sm font-medium text-gray-700">패키지비 (￦)</label>
             <div className="rounded-xl border border-gray-300 bg-white px-3">
               <input
                 type="number"
@@ -317,7 +315,7 @@ setDefectRate(0);
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">배송비</label>
+            <label className="block text-sm font-medium text-gray-700">배송비 (￦)</label>
             <div className="rounded-xl border border-gray-300 bg-white px-3">
               <input
                 type="number"
@@ -329,7 +327,7 @@ setDefectRate(0);
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">광고비</label>
+            <label className="block text-sm font-medium text-gray-700">광고비 (￦)</label>
             <div className="rounded-xl border border-gray-300 bg-white px-3">
               <input
                 type="number"
@@ -341,7 +339,7 @@ setDefectRate(0);
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">보관비</label>
+            <label className="block text-sm font-medium text-gray-700">보관비 (￦)</label>
             <div className="rounded-xl border border-gray-300 bg-white px-3">
               <input
                 type="number"
@@ -353,7 +351,7 @@ setDefectRate(0);
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">반품비</label>
+            <label className="block text-sm font-medium text-gray-700">반품비 (￦)</label>
             <div className="rounded-xl border border-gray-300 bg-white px-3">
               <input
                 type="number"
@@ -365,7 +363,7 @@ setDefectRate(0);
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">불량률</label>
+            <label className="block text-sm font-medium text-gray-700">불량률 (%)</label>
             <div className="rounded-xl border border-gray-300 bg-white px-3">
               <input
                 type="number"
@@ -377,7 +375,7 @@ setDefectRate(0);
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">플랫폼 수수료</label>
+            <label className="block text-sm font-medium text-gray-700">플랫폼 수수료 (%)</label>
             <div className="rounded-xl border border-gray-300 bg-white px-3">
               <input
                 type="number"
@@ -389,7 +387,7 @@ setDefectRate(0);
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">목표 마진</label>
+            <label className="block text-sm font-medium text-gray-700">목표 마진 (%)</label>
             <div className="rounded-xl border border-gray-300 bg-white px-3">
               <input
                 type="number"
@@ -401,7 +399,7 @@ setDefectRate(0);
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">오프라인 할인율</label>
+            <label className="block text-sm font-medium text-gray-700">오프라인 할인율 (%)</label>
             <div className="rounded-xl border border-gray-300 bg-white px-3">
               <input
                 type="number"
@@ -413,7 +411,7 @@ setDefectRate(0);
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">유통 할인율</label>
+            <label className="block text-sm font-medium text-gray-700">유통 할인율 (%)</label>
             <div className="rounded-xl border border-gray-300 bg-white px-3">
               <input
                 type="number"

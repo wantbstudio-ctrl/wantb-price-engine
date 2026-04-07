@@ -2,13 +2,15 @@
 
 import PriceCalculator from "../components/PriceCalculator";
 
-export default function DashboardPage() {
+export default function Page() {
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
-      <p className="text-gray-500 mb-6">
-        판매가 계산, 제품 저장, 견적 연결을 한 화면에서 관리합니다.
-      </p>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900">
+          Selling Price Calculator
+        </h1>
+        <p className="mt-2 text-sm text-gray-500">판매가 계산기</p>
+      </div>
 
       <PriceCalculator />
     </div>
