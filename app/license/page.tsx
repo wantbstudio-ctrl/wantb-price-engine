@@ -3,20 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-declare global {
-  interface Window {
-    electronAPI?: {
-      getHardwareId?: () => Promise<string>;
-      getLicenseStatus?: () => Promise<string>;
-      validateAndSaveLicense?: (code: string) => Promise<{
-        success: boolean;
-        message?: string;
-      }>;
-      clearLicense?: () => Promise<void>;
-    };
-  }
-}
-
 export default function LicensePage() {
   const router = useRouter();
 
@@ -26,6 +12,10 @@ export default function LicensePage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+  const noDragStyle = {
+    WebkitAppRegion: "no-drag",
+  } as any;
+
   useEffect(() => {
     let mounted = true;
 
@@ -33,10 +23,7 @@ export default function LicensePage() {
       try {
         if (typeof window === "undefined") return;
 
-        const savedStatus =
-          typeof window !== "undefined"
-            ? localStorage.getItem("wantb-license")
-            : null;
+        const savedStatus = localStorage.getItem("wantb-license");
 
         if (savedStatus === "ACTIVE") {
           router.replace("/");
@@ -44,19 +31,20 @@ export default function LicensePage() {
         }
 
         if (window.electronAPI?.getLicenseStatus) {
-          const status = await window.electronAPI.getLicenseStatus();
+const licenseStatus = await window.electronAPI.getLicenseStatus();
 
-          if (!mounted) return;
+if (!mounted) return;
 
-          if (status === "ACTIVE") {
-            localStorage.setItem("wantb-license", "ACTIVE");
-            router.replace("/");
-            return;
-          }
+if (licenseStatus?.status === "ACTIVE") {
+  localStorage.setItem("wantb-license", "ACTIVE");
+  router.replace("/");
+  return;
+}
         }
 
         if (window.electronAPI?.getHardwareId) {
           const id = await window.electronAPI.getHardwareId();
+
           if (!mounted) return;
           setHardwareId(id || "");
         }
@@ -99,12 +87,12 @@ export default function LicensePage() {
       );
 
       if (result?.success) {
-        localStorage.setItem("wantb-license", "ACTIVE");
-        setMessage("인증 완료. 잠시 후 이동합니다.");
-        router.replace("/");
-      } else {
-        setMessage(result?.message || "라이센스 인증에 실패했습니다.");
-      }
+  localStorage.setItem("wantb-license", "ACTIVE");
+  setMessage("인증 완료. 잠시 후 이동합니다.");
+  router.replace("/");
+} else {
+  setMessage("라이센스 인증에 실패했습니다.");
+}
     } catch (error) {
       console.error("License activate error:", error);
       setMessage("라이센스 인증 중 오류가 발생했습니다.");
@@ -124,8 +112,14 @@ export default function LicensePage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-100">
-        <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg">
+      <div
+        className="flex min-h-screen items-center justify-center bg-gray-100"
+        style={noDragStyle}
+      >
+        <div
+          className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg"
+          style={noDragStyle}
+        >
           <h1 className="mb-3 text-2xl font-bold text-gray-900">
             WantB Price Engine
           </h1>
@@ -138,11 +132,11 @@ export default function LicensePage() {
   return (
     <div
       className="flex min-h-screen items-center justify-center bg-gray-100 px-4"
-      style={{ WebkitAppRegion: "no-drag" }}
+      style={noDragStyle}
     >
       <div
         className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg"
-        style={{ WebkitAppRegion: "no-drag" }}
+        style={noDragStyle}
       >
         <h1 className="mb-2 text-2xl font-bold text-gray-900">
           WantB Price Engine
@@ -160,7 +154,7 @@ export default function LicensePage() {
             value={hardwareId}
             readOnly
             className="w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-700 outline-none"
-            style={{ WebkitAppRegion: "no-drag" }}
+            style={noDragStyle}
           />
         </div>
 
@@ -176,7 +170,7 @@ export default function LicensePage() {
             placeholder="예: WW12345A"
             autoFocus
             className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none focus:border-gray-900"
-            style={{ WebkitAppRegion: "no-drag" }}
+            style={noDragStyle}
           />
         </div>
 
@@ -191,7 +185,7 @@ export default function LicensePage() {
           onClick={handleActivate}
           disabled={submitting}
           className="w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
-          style={{ WebkitAppRegion: "no-drag" }}
+          style={noDragStyle}
         >
           {submitting ? "인증 중..." : "활성화"}
         </button>
