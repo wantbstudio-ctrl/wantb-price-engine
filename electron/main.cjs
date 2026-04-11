@@ -5,7 +5,6 @@ const os = require("os");
 const crypto = require("crypto");
 
 const isDev = !app.isPackaged;
-const SECRET = "WANTB_SECRET";
 
 let mainWindow = null;
 
@@ -46,24 +45,50 @@ function writeLicenseFile(data) {
   }
 }
 
-function generateExpectedLicense(hardwareId) {
-  return crypto
-    .createHash("sha256")
-    .update(`${hardwareId}-${SECRET}`)
-    .digest("hex")
-    .slice(0, 16)
-    .toUpperCase();
+function isLicenseActivated() {
+  const saved = readLicenseFile();
+  return !!saved?.activated;
 }
 
-function isValidLicenseKey(inputKey, hardwareId) {
-  if (!inputKey) return false;
+function getLicenseCodesFilePath() {
+  return path.join(__dirname, "../license-data/license-codes.txt");
+}
 
-  const trimmed = String(inputKey).trim();
+function isValidLicenseKey(inputKey) {
+  try {
+    if (!inputKey) return false;
 
-  if (trimmed === "test123") return true;
+    const trimmed = String(inputKey).trim().toUpperCase();
+    const filePath = getLicenseCodesFilePath();
 
-  const expected = generateExpectedLicense(hardwareId);
-  return trimmed === expected;
+    if (!fs.existsSync(filePath)) {
+      console.error("license-codes.txt 없음:", filePath);
+      return false;
+    }
+
+    const raw = fs.readFileSync(filePath, "utf-8");
+
+    const codes = raw
+      .split(/\r?\n/)
+      .map((line) => line.trim().toUpperCase())
+      .filter(Boolean);
+
+    return codes.includes(trimmed);
+  } catch (error) {
+    console.error("라이센스 검증 실패:", error);
+    return false;
+  }
+}
+
+function getDevStartUrl() {
+  return isLicenseActivated()
+    ? "http://localhost:3000/"
+    : "http://localhost:3000/license";
+}
+
+function getProdStartUrl() {
+  const targetFile = isLicenseActivated() ? "index.html" : "license.html";
+  return `file://${path.join(__dirname, "../out", targetFile)}`;
 }
 
 async function createMainWindow() {
@@ -81,7 +106,6 @@ async function createMainWindow() {
       sandbox: false,
     },
   });
-  mainWindow.webContents.openDevTools();
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
@@ -89,10 +113,9 @@ async function createMainWindow() {
   });
 
   if (isDev) {
-    await mainWindow.loadURL("http://localhost:3000/company-settings");
+    await mainWindow.loadURL(getDevStartUrl());
   } else {
-    const startUrl = `file://${path.join(__dirname, "../out/company-settings.html")}`;
-    await mainWindow.loadURL(startUrl);
+    await mainWindow.loadURL(getProdStartUrl());
   }
 }
 
@@ -103,6 +126,7 @@ app.whenReady().then(async () => {
 
   ipcMain.handle("getLicenseStatus", async () => {
     const saved = readLicenseFile();
+
     if (!saved) {
       return {
         activated: false,
@@ -120,8 +144,9 @@ app.whenReady().then(async () => {
 
   ipcMain.handle("validateAndSaveLicense", async (_, licenseKey) => {
     const hardwareId = createHardwareId();
+    const normalized = String(licenseKey || "").trim().toUpperCase();
 
-    if (!isValidLicenseKey(licenseKey, hardwareId)) {
+    if (!isValidLicenseKey(normalized)) {
       return {
         success: false,
         message: "유효하지 않은 라이센스 키입니다.",
@@ -130,7 +155,7 @@ app.whenReady().then(async () => {
 
     const saved = writeLicenseFile({
       activated: true,
-      licenseKey: String(licenseKey).trim(),
+      licenseKey: normalized,
       hardwareId,
       activatedAt: new Date().toISOString(),
     });
@@ -151,6 +176,7 @@ app.whenReady().then(async () => {
   ipcMain.handle("clearLicense", async () => {
     try {
       const filePath = getLicenseFilePath();
+
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }

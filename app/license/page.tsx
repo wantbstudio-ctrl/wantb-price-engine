@@ -165,7 +165,7 @@ if (licenseStatus?.status === "ACTIVE") {
           <input
             type="text"
             value={licenseCode}
-            onChange={(e) => setLicenseCode(e.target.value.toUpperCase())}
+            onChange={(e) => setLicenseCode(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="예: WW12345A"
             autoFocus
