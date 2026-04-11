@@ -1,20 +1,12 @@
 {
   "name": "wantb-price-engine",
   "version": "1.0.0",
-  "main": "electron/main.cjs",
   "private": true,
-
+  "main": "electron/main.cjs",
   "scripts": {
-    "dev": "next dev -p 3000",
     "build": "next build",
-    "start": "next start -p 3000",
-
-    "electron": "electron .",
-    "electron-dev": "concurrently \"next dev -p 3000\" \"wait-on http://localhost:3000 && electron .\"",
-
-    "dist": "npm run build && electron-builder"
+    "dist-installer": "npm run build && electron-builder --win nsis"
   },
-
   "dependencies": {
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1",
@@ -22,7 +14,6 @@
     "react": "18.2.0",
     "react-dom": "18.2.0"
   },
-
   "devDependencies": {
     "@types/node": "^20.11.30",
     "@types/react": "^18.2.66",
@@ -36,25 +27,20 @@
     "typescript": "^5.4.2",
     "wait-on": "^7.0.1"
   },
-
   "build": {
     "appId": "com.wantb.priceengine",
     "productName": "WantB Price Engine",
-    "icon": "icons/wantb.ico",
-
     "directories": {
       "output": "dist"
     },
-
     "files": [
       "electron/**/*",
       ".next/**/*",
+      "license-data/**/*",
       "package.json"
     ],
-
     "win": {
-      "target": "nsis",
-      "icon": "icons/wantb.ico"
+      "target": "nsis"
     }
   }
 }
