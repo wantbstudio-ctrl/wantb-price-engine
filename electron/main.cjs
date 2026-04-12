@@ -5,9 +5,11 @@ const os = require("os");
 const crypto = require("crypto");
 const http = require("http");
 const next = require("next");
+const { getEmbeddedLicenseCodes } = require("./licenseStore.cjs");
 
 const isDev = !app.isPackaged;
 const PROD_PORT = 3210;
+const MASTER_KEY = "WANTB-MASTER-001";
 
 let mainWindow = null;
 let prodServer = null;
@@ -49,14 +51,6 @@ function getLicenseFilePath() {
   return path.join(getUserDataDir(), "license.json");
 }
 
-function getLicenseCodesFilePath() {
-  if (isDev) {
-    return path.join(__dirname, "..", "license-data", "license-codes.txt");
-  }
-
-  return path.join(process.resourcesPath, "license-data", "license-codes.txt");
-}
-
 function ensureUserDataDir() {
   const dir = getUserDataDir();
   if (!fs.existsSync(dir)) {
@@ -74,7 +68,12 @@ function createHardwareId() {
       os.totalmem()?.toString() || "",
     ].join("|");
 
-    return crypto.createHash("sha256").update(raw).digest("hex").slice(0, 16).toUpperCase();
+    return crypto
+      .createHash("sha256")
+      .update(raw)
+      .digest("hex")
+      .slice(0, 16)
+      .toUpperCase();
   } catch (error) {
     writeDebugLog("Hardware ID 생성 실패", error?.message || error);
     return "UNKNOWN-HWID";
@@ -100,7 +99,11 @@ function readLicenseFile() {
 function writeLicenseFile(data) {
   try {
     ensureUserDataDir();
-    fs.writeFileSync(getLicenseFilePath(), JSON.stringify(data, null, 2), "utf-8");
+    fs.writeFileSync(
+      getLicenseFilePath(),
+      JSON.stringify(data, null, 2),
+      "utf-8"
+    );
     return true;
   } catch (error) {
     writeDebugLog("라이센스 파일 저장 실패", error?.message || error);
@@ -118,19 +121,13 @@ function isValidLicenseKey(inputKey) {
     const normalized = String(inputKey || "").trim().toUpperCase();
     if (!normalized) return false;
 
-    const codesFilePath = getLicenseCodesFilePath();
-    writeDebugLog("license path", codesFilePath);
-
-    if (!fs.existsSync(codesFilePath)) {
-      writeDebugLog("license-codes.txt 없음", codesFilePath);
-      return false;
+    if (normalized === MASTER_KEY.toUpperCase()) {
+      writeDebugLog("MASTER KEY 인증 성공");
+      return true;
     }
 
-    const raw = fs.readFileSync(codesFilePath, "utf-8");
-    const codes = raw
-      .split(/\r?\n/)
-      .map((line) => line.trim().toUpperCase())
-      .filter(Boolean);
+    const codes = getEmbeddedLicenseCodes();
+    writeDebugLog("embedded license code count", codes.length);
 
     return codes.includes(normalized);
   } catch (error) {
@@ -160,7 +157,10 @@ async function ensureProdServer() {
   writeDebugLog("appDir", appDir);
   writeDebugLog("process.resourcesPath", process.resourcesPath);
   writeDebugLog(".next exists", fs.existsSync(path.join(appDir, ".next")));
-  writeDebugLog("next.config.js exists", fs.existsSync(path.join(appDir, "next.config.js")));
+  writeDebugLog(
+    "next.config.js exists",
+    fs.existsSync(path.join(appDir, "next.config.js"))
+  );
 
   nextApp = next({
     dev: false,
@@ -200,8 +200,8 @@ async function createMainWindow() {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
-    }
+      sandbox: false,
+    },
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -239,13 +239,13 @@ app.whenReady().then(async () => {
       return {
         activated: !!saved?.activated,
         licenseKey: saved?.licenseKey || "",
-        hardwareId: saved?.hardwareId || createHardwareId()
+        hardwareId: saved?.hardwareId || createHardwareId(),
       };
     } catch {
       return {
         activated: false,
         licenseKey: "",
-        hardwareId: createHardwareId()
+        hardwareId: createHardwareId(),
       };
     }
   });
@@ -258,7 +258,7 @@ app.whenReady().then(async () => {
       if (!isValidLicenseKey(normalized)) {
         return {
           success: false,
-          message: "유효하지 않은 라이센스 키입니다."
+          message: "유효하지 않은 라이센스 키입니다.",
         };
       }
 
@@ -266,25 +266,25 @@ app.whenReady().then(async () => {
         activated: true,
         licenseKey: normalized,
         hardwareId,
-        activatedAt: new Date().toISOString()
+        activatedAt: new Date().toISOString(),
       });
 
       if (!saved) {
         return {
           success: false,
-          message: "라이센스 저장 중 오류가 발생했습니다."
+          message: "라이센스 저장 중 오류가 발생했습니다.",
         };
       }
 
       return {
         success: true,
-        message: "라이센스 인증이 완료되었습니다."
+        message: "라이센스 인증이 완료되었습니다.",
       };
     } catch (error) {
       writeDebugLog("라이센스 인증 처리 실패", error?.message || error);
       return {
         success: false,
-        message: "라이센스 인증 중 오류가 발생했습니다."
+        message: "라이센스 인증 중 오류가 발생했습니다.",
       };
     }
   });
