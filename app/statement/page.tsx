@@ -546,7 +546,48 @@ function StatementHalfDocument({
 }) {
   const border = `1px solid ${color}`;
   const outerBorder = `2px solid ${color}`;
-  const halfHeight = "652px";
+  const halfHeight = "646px";
+
+  const renderVerticalLabel = (text: string) => {
+    return (
+      <div
+        style={{
+          height: "100%",
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0px",
+            fontSize: "14px",
+            fontWeight: 700,
+            lineHeight: 1,
+            color,
+          }}
+        >
+          {text.split("").map((char, index) => (
+            <span
+              key={`${text}-${index}`}
+              style={{
+                display: "block",
+                height: "14px",
+                lineHeight: "14px",
+              }}
+            >
+              {char}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div
@@ -570,7 +611,7 @@ function StatementHalfDocument({
           alignItems: "center",
           justifyContent: "center",
           fontWeight: 800,
-          fontSize: "24px",
+          fontSize: "28px",
           color,
           letterSpacing: "-0.5px",
           gap: "4px",
@@ -578,9 +619,9 @@ function StatementHalfDocument({
         }}
       >
         <span>거래명세서</span>
- <span style={{ fontSize: "13px", fontWeight: 700 }}>
-  {color === "#ff3b30" ? "(공급자 보관용)" : "(공급받는자 보관용)"}
-</span>
+        <span style={{ fontSize: "15px", fontWeight: 700 }}>
+          {color === "#ff3b30" ? "(공급자 보관용)" : "(공급받는자 보관용)"}
+        </span>
       </div>
 
       <table
@@ -591,15 +632,16 @@ function StatementHalfDocument({
         }}
       >
         <colgroup>
-          <col style={{ width: "48px" }} />
-          <col style={{ width: "104px" }} />
-          <col style={{ width: "220px" }} />
-          <col style={{ width: "48px" }} />
+          <col style={{ width: "44px" }} />
+          <col style={{ width: "84px" }} />
+          <col style={{ width: "250px" }} />
+          <col style={{ width: "52px" }} />
           <col style={{ width: "92px" }} />
           <col style={{ width: "206px" }} />
           <col style={{ width: "92px" }} />
           <col style={{ width: "154px" }} />
         </colgroup>
+
         <tbody>
           <tr>
             <td
@@ -607,19 +649,14 @@ function StatementHalfDocument({
               style={{
                 borderRight: border,
                 borderBottom: border,
-                color,
-                fontWeight: 700,
                 textAlign: "center",
-                writingMode: "vertical-rl",
-                textOrientation: "mixed",
-                letterSpacing: "0px",
-                fontSize: "15px",
-                padding: "2px 0",
-                lineHeight: 1,
+                padding: 0,
+                verticalAlign: "middle",
               }}
             >
-              공급받는자
+              {renderVerticalLabel("공급받는자")}
             </td>
+
             <td
               style={{
                 borderRight: border,
@@ -638,11 +675,12 @@ function StatementHalfDocument({
               style={{
                 borderRight: border,
                 borderBottom: border,
-                fontSize: "12px",
-                fontWeight: 600,
-                padding: "4px 8px",
-                height: "32px",
-                lineHeight: 1.15,
+                fontSize: "17px",
+                fontWeight: 400,
+                padding: "6px 10px",
+                height: "40px",
+                lineHeight: 1.25,
+                verticalAlign: "middle",
               }}
             >
               {receiver.companyName || ""}
@@ -653,19 +691,14 @@ function StatementHalfDocument({
               style={{
                 borderRight: border,
                 borderBottom: border,
-                color,
-                fontWeight: 700,
                 textAlign: "center",
-                writingMode: "vertical-rl",
-                textOrientation: "mixed",
-                letterSpacing: "0px",
-                fontSize: "15px",
-                padding: "2px 0",
-                lineHeight: 1,
+                padding: 0,
+                verticalAlign: "middle",
               }}
             >
-              공급자
+              {renderVerticalLabel("공급자")}
             </td>
+
             <td
               style={{
                 borderRight: border,
@@ -684,11 +717,12 @@ function StatementHalfDocument({
               style={{
                 borderRight: border,
                 borderBottom: border,
-                fontSize: "12px",
-                fontWeight: 600,
-                padding: "4px 8px",
-                height: "32px",
-                lineHeight: 1.15,
+                fontSize: "17px",
+                fontWeight: 400,
+                padding: "6px 10px",
+                height: "40px",
+                lineHeight: 1.25,
+                verticalAlign: "middle",
               }}
             >
               {supplier.businessNumber || ""}
@@ -710,11 +744,12 @@ function StatementHalfDocument({
             <td
               style={{
                 borderBottom: border,
-                fontSize: "12px",
-                fontWeight: 600,
-                padding: "4px 8px",
-                height: "32px",
-                lineHeight: 1.15,
+                fontSize: "17px",
+                fontWeight: 400,
+                padding: "6px 10px",
+                height: "40px",
+                lineHeight: 1.25,
+                verticalAlign: "middle",
               }}
             >
               {supplier.ceoName || ""}
@@ -730,7 +765,7 @@ function StatementHalfDocument({
                 fontWeight: 700,
                 textAlign: "center",
                 fontSize: "15px",
-                height: "40px",
+                height: "52px",
                 lineHeight: 1,
               }}
             >
@@ -740,12 +775,12 @@ function StatementHalfDocument({
               style={{
                 borderRight: border,
                 borderBottom: border,
-                fontSize: "11px",
-                fontWeight: 600,
-                padding: "4px 8px",
-                lineHeight: 1.15,
+                fontSize: "15px",
+                fontWeight: 400,
+                padding: "6px 10px",
+                height: "52px",
+                lineHeight: 1.2,
                 verticalAlign: "middle",
-                height: "40px",
               }}
             >
               {receiver.address || ""}
@@ -759,43 +794,66 @@ function StatementHalfDocument({
                 fontWeight: 700,
                 textAlign: "center",
                 fontSize: "15px",
-                height: "40px",
+                height: "32px",
                 lineHeight: 1,
               }}
             >
               상호명
             </td>
-            <td
-              style={{
-                borderRight: border,
-                borderBottom: border,
-                fontSize: "12px",
-                fontWeight: 600,
-                padding: "4px 8px",
-                height: "40px",
-                lineHeight: 1.15,
-              }}
-            >
- <div style={{ position: "relative", width: "100%", height: "100%" }}>
-
-  <div>{supplier.companyName || ""}</div>
-
-{companySettings?.stamp && (
-  <img
-    src={companySettings.stamp}
+ <td
+  style={{
+    borderRight: border,
+    borderBottom: border,
+    fontSize: "17px",
+    fontWeight: 400,
+    padding: 0,
+    height: "40px",
+    lineHeight: 1.25,
+    verticalAlign: "middle",
+    position: "relative",
+  }}
+>
+  <div
+    style={{
+      position: "relative",
+      width: "100%",
+      height: "100%",
+      display: "flex",
+      alignItems: "center",
+      paddingLeft: "10px",
+      paddingRight: "52px",
+      boxSizing: "border-box",
+      overflow: "hidden",
+    }}
+  >
+    <span
       style={{
-        position: "absolute",
-        right: "6px",
-        top: "50%",
-        transform: "translateY(-50%)",
-        width: "52px",
-        opacity: 0.9,
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
       }}
-    />
-  )}
+    >
+      {supplier.companyName || ""}
+    </span>
 
-</div>
-            </td>
+    {companySettings?.stamp && (
+      <img
+        src={companySettings.stamp}
+        alt="stamp"
+        style={{
+          position: "absolute",
+          right: "6px",
+          top: "50%",
+          transform: "translateY(-50%)",
+          width: "42px",
+          height: "42px",
+          objectFit: "contain",
+          opacity: 0.95,
+        }}
+      />
+    )}
+  </div>
+</td>
             <td
               style={{
                 borderRight: border,
@@ -804,7 +862,7 @@ function StatementHalfDocument({
                 fontWeight: 700,
                 textAlign: "center",
                 fontSize: "15px",
-                height: "40px",
+                height: "32px",
                 lineHeight: 1,
               }}
             >
@@ -813,11 +871,12 @@ function StatementHalfDocument({
             <td
               style={{
                 borderBottom: border,
-                fontSize: "12px",
-                fontWeight: 600,
-                padding: "4px 8px",
+                fontSize: "17px",
+                fontWeight: 400,
+                padding: "6px 10px",
                 height: "40px",
-                lineHeight: 1.15,
+                lineHeight: 1.25,
+                verticalAlign: "middle",
               }}
             >
               {supplier.fax || ""}
@@ -843,11 +902,12 @@ function StatementHalfDocument({
               style={{
                 borderRight: border,
                 borderBottom: border,
-                fontSize: "12px",
-                fontWeight: 600,
-                padding: "4px 8px",
-                height: "32px",
-                lineHeight: 1.15,
+                fontSize: "17px",
+                fontWeight: 400,
+                padding: "6px 10px",
+                height: "40px",
+                lineHeight: 1.25,
+                verticalAlign: "middle",
               }}
             >
               {receiver.phone || ""}
@@ -861,7 +921,7 @@ function StatementHalfDocument({
                 fontWeight: 700,
                 textAlign: "center",
                 fontSize: "15px",
-                height: "32px",
+                height: "52px",
                 lineHeight: 1,
               }}
             >
@@ -871,12 +931,12 @@ function StatementHalfDocument({
               style={{
                 borderRight: border,
                 borderBottom: border,
-                fontSize: "11px",
-                fontWeight: 600,
-                padding: "4px 8px",
-                lineHeight: 1.15,
+                fontSize: "15px",
+                fontWeight: 400,
+                padding: "6px 10px",
+                height: "52px",
+                lineHeight: 1.2,
                 verticalAlign: "middle",
-                height: "32px",
               }}
             >
               {supplier.address || ""}
@@ -898,104 +958,104 @@ function StatementHalfDocument({
             <td
               style={{
                 borderBottom: border,
-                fontSize: "12px",
-                fontWeight: 700,
-                padding: "4px 8px",
-                height: "32px",
-                lineHeight: 1.15,
+                fontSize: "17px",
+                fontWeight: 400,
+                padding: "6px 10px",
+                height: "40px",
+                lineHeight: 1.25,
+                verticalAlign: "middle",
               }}
             >
               {vatMode === "included" ? "포함" : "별도"}
             </td>
           </tr>
 
-<tr>
-  <td
-    style={{
-      borderRight: border,
-      borderBottom: border,
-      color,
-      fontWeight: 700,
-      textAlign: "center",
-      fontSize: "15px",
-      lineHeight: 1.05,
-      height: "36px",
-    }}
-  >
-    합계금액
-  </td>
+          <tr>
+            <td
+              style={{
+                borderRight: border,
+                borderBottom: border,
+                color,
+                fontWeight: 700,
+                textAlign: "center",
+                fontSize: "15px",
+                height: "32px",
+                lineHeight: 1,
+              }}
+            >
+              합계금액
+            </td>
+            <td
+              style={{
+                borderRight: border,
+                borderBottom: border,
+                fontSize: "17px",
+                fontWeight: 600,
+                padding: "6px 10px",
+                height: "40px",
+                lineHeight: 1.25,
+                verticalAlign: "middle",
+              }}
+            >
+              {formatNumber(totalAmount)}
+            </td>
 
-  <td
-    style={{
-      borderRight: border,
-      borderBottom: border,
-      fontSize: "12px",
-      fontWeight: 700,
-      padding: "4px 8px",
-      height: "36px",
-      lineHeight: 1.15,
-    }}
-  >
-    {formatNumber(totalAmount)}
-  </td>
-
-  <td
-    style={{
-      borderRight: border,
-      borderBottom: border,
-      color,
-      fontWeight: 700,
-      textAlign: "center",
-      fontSize: "15px",
-      height: "36px",
-      lineHeight: 1,
-    }}
-  >
-    전화
-  </td>
-
-  <td
-    style={{
-      borderRight: border,
-      borderBottom: border,
-      fontSize: "12px",
-      fontWeight: 600,
-      padding: "4px 8px",
-      height: "36px",
-      lineHeight: 1.15,
-    }}
-  >
-    {supplier.phone || ""}
-  </td>
-
-  <td
-    style={{
-      borderRight: border,
-      borderBottom: border,
-      color,
-      fontWeight: 700,
-      textAlign: "center",
-      fontSize: "15px",
-      height: "36px",
-      lineHeight: 1,
-    }}
-  >
-    비고
-  </td>
-
-  <td
-    style={{
-      borderBottom: border,
-      fontSize: "11px",
-      fontWeight: 600,
-      padding: "4px 8px",
-      lineHeight: 1.1,
-      height: "36px",
-    }}
-  >
-    {notes || ""}
-  </td>
-</tr>
+            <td
+              style={{
+                borderRight: border,
+                borderBottom: border,
+                color,
+                fontWeight: 700,
+                textAlign: "center",
+                fontSize: "15px",
+                height: "32px",
+                lineHeight: 1,
+              }}
+            >
+              전화
+            </td>
+            <td
+              style={{
+                borderRight: border,
+                borderBottom: border,
+                fontSize: "17px",
+                fontWeight: 400,
+                padding: "6px 10px",
+                height: "40px",
+                lineHeight: 1.25,
+                verticalAlign: "middle",
+              }}
+            >
+              {supplier.phone || ""}
+            </td>
+            <td
+              style={{
+                borderRight: border,
+                borderBottom: border,
+                color,
+                fontWeight: 700,
+                textAlign: "center",
+                fontSize: "15px",
+                height: "32px",
+                lineHeight: 1,
+              }}
+            >
+              비고
+            </td>
+            <td
+              style={{
+                borderBottom: border,
+                fontSize: "15px",
+                fontWeight: 400,
+                padding: "6px 10px",
+                height: "40px",
+                lineHeight: 1.2,
+                verticalAlign: "middle",
+              }}
+            >
+              {notes || ""}
+            </td>
+          </tr>
         </tbody>
       </table>
 
@@ -1013,6 +1073,7 @@ function StatementHalfDocument({
             <col key={index} style={{ width: `${width}px` }} />
           ))}
         </colgroup>
+
         <thead>
           <tr>
             {["년", "월", "일", "품목", "규격", "단위", "수량", "단가", "공급가액", "세액"].map(
@@ -1022,10 +1083,10 @@ function StatementHalfDocument({
                   style={{
                     border: border,
                     color,
-                    fontWeight: 800,
+                    fontWeight: 700,
                     textAlign: "center",
-                    fontSize: "14px",
-                    height: "28px",
+                    fontSize: "17px",
+                    height: "32px",
                     lineHeight: 1,
                     padding: 0,
                   }}
@@ -1036,208 +1097,275 @@ function StatementHalfDocument({
             )}
           </tr>
         </thead>
-        <tbody>
-          {rows.map((row, index) => (
-            <tr key={`${row.id}-${index}`}>
-              <td
-                style={{
-                  border,
-                  height: "26px",
-                  textAlign: "center",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  lineHeight: 1,
-                  padding: 0,
-                }}
-              >
-                {row.dateYear || ""}
-              </td>
-              <td
-                style={{
-                  border,
-                  textAlign: "center",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  lineHeight: 1,
-                  padding: 0,
-                }}
-              >
-                {row.dateMonth || ""}
-              </td>
-              <td
-                style={{
-                  border,
-                  textAlign: "center",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  lineHeight: 1,
-                  padding: 0,
-                }}
-              >
-                {row.dateDay || ""}
-              </td>
-              <td
-                style={{
-                  border,
-                  padding: "0 6px",
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  lineHeight: 1.05,
-                }}
-              >
-                {row.productName || ""}
-              </td>
-              <td
-                style={{
-                  border,
-                  textAlign: "center",
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  lineHeight: 1.05,
-                  padding: 0,
-                }}
-              >
-                {row.spec || ""}
-              </td>
-              <td
-                style={{
-                  border,
-                  textAlign: "center",
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  lineHeight: 1.05,
-                  padding: 0,
-                }}
-              >
-                {row.unit || ""}
-              </td>
-              <td
-                style={{
-                  border,
-                  textAlign: "center",
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  lineHeight: 1.05,
-                  padding: 0,
-                }}
-              >
-                {row.quantity ? formatNumber(row.quantity) : ""}
-              </td>
-              <td
-                style={{
-                  border,
-                  textAlign: "center",
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  lineHeight: 1.05,
-                  padding: 0,
-                }}
-              >
-                {row.unitPrice ? formatNumber(row.unitPrice) : ""}
-              </td>
-              <td
-                style={{
-                  border,
-                  textAlign: "center",
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  lineHeight: 1.05,
-                  padding: 0,
-                }}
-              >
-                {row.supplyAmount ? formatNumber(row.supplyAmount) : ""}
-              </td>
-              <td
-                style={{
-                  border,
-                  textAlign: "center",
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  lineHeight: 1.05,
-                  padding: 0,
-                }}
-              >
-                {row.taxAmount ? formatNumber(row.taxAmount) : ""}
-              </td>
-            </tr>
-          ))}
 
-<tr>
-  <td colSpan={3} style={{ border, height: "26px", textAlign: "center", fontSize: "12px", fontWeight: 900, color, padding: 0 }}>
-    인수자
-  </td>
+<tbody>
+  {rows.map((row, index) => (
+    <tr key={`${row.id}-${index}`}>
+      <td
+        style={{
+          border: border,
+          height: "26px",
+          textAlign: "center",
+          fontSize: "15px",
+          fontWeight: 400,
+          lineHeight: 1.1,
+          padding: 0,
+        }}
+      >
+        {row.dateYear || ""}
+      </td>
+      <td
+        style={{
+          border: border,
+          height: "26px",
+          textAlign: "center",
+          fontSize: "15px",
+          fontWeight: 400,
+          lineHeight: 1.1,
+          padding: 0,
+        }}
+      >
+        {row.dateMonth || ""}
+      </td>
+      <td
+        style={{
+          border: border,
+          height: "26px",
+          textAlign: "center",
+          fontSize: "15px",
+          fontWeight: 400,
+          lineHeight: 1.1,
+          padding: 0,
+        }}
+      >
+        {row.dateDay || ""}
+      </td>
+      <td
+        style={{
+          border: border,
+          height: "26px",
+          textAlign: "left",
+          fontSize: "15px",
+          fontWeight: 400,
+          lineHeight: 1.1,
+          padding: "0 8px",
+        }}
+      >
+        {row.productName || ""}
+      </td>
+      <td
+        style={{
+          border: border,
+          height: "26px",
+          textAlign: "center",
+          fontSize: "15px",
+          fontWeight: 400,
+          lineHeight: 1.1,
+          padding: 0,
+        }}
+      >
+        {row.spec || ""}
+      </td>
+      <td
+        style={{
+          border: border,
+          height: "26px",
+          textAlign: "center",
+          fontSize: "15px",
+          fontWeight: 400,
+          lineHeight: 1.1,
+          padding: 0,
+        }}
+      >
+        {row.unit || ""}
+      </td>
+      <td
+        style={{
+          border: border,
+          height: "26px",
+          textAlign: "center",
+          fontSize: "15px",
+          fontWeight: 400,
+          lineHeight: 1.1,
+          padding: 0,
+        }}
+      >
+        {row.quantity ? formatNumber(row.quantity) : ""}
+      </td>
+      <td
+        style={{
+          border: border,
+          height: "26px",
+          textAlign: "center",
+          fontSize: "15px",
+          fontWeight: 400,
+          lineHeight: 1.1,
+          padding: 0,
+        }}
+      >
+        {row.unitPrice ? formatNumber(row.unitPrice) : ""}
+      </td>
+      <td
+        style={{
+          border: border,
+          height: "26px",
+          textAlign: "center",
+          fontSize: "15px",
+          fontWeight: 400,
+          lineHeight: 1.1,
+          padding: 0,
+        }}
+      >
+        {row.supplyAmount ? formatNumber(row.supplyAmount) : ""}
+      </td>
+      <td
+        style={{
+          border: border,
+          height: "26px",
+          textAlign: "center",
+          fontSize: "15px",
+          fontWeight: 400,
+          lineHeight: 1.1,
+          padding: 0,
+        }}
+      >
+        {row.taxAmount ? formatNumber(row.taxAmount) : ""}
+      </td>
+    </tr>
+  ))}
 
-  <td style={{ border, height: "26px", textAlign: "center", fontSize: "12px", fontWeight: 700, padding: 0 }}>
-  <div style={{ position: "relative", width: "100%", height: "100%" }}>
+  <tr>
+    <td
+      colSpan={3}
+      style={{
+        border: border,
+        height: "26px",
+        textAlign: "center",
+        fontSize: "15px",
+        fontWeight: 700,
+        color,
+        padding: 0,
+      }}
+    >
+      인수자
+    </td>
 
-  <div
-    style={{
-      position: "absolute",
-      left: "50%",
-      top: "50%",
-      transform: "translate(-50%, -50%)",
-    }}
-  >
-    {receiverSigner || ""}
-  </div>
+    <td
+      style={{
+        border: border,
+        height: "26px",
+        textAlign: "center",
+        fontSize: "15px",
+        fontWeight: 400,
+        padding: 0,
+      }}
+    >
+      <div style={{ position: "relative", width: "100%", height: "100%" }}>
+        <div
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: "50%",
+            transform: "translate(-50%, -50%)",
+          }}
+        >
+          {receiverSigner || ""}
+        </div>
 
-  <div
-    style={{
-      position: "absolute",
-      right: "6px",
-      top: "50%",
-      transform: "translateY(-50%)",
-      fontSize: "10px",
-    }}
-  >
-    서명
-  </div>
+        <div
+          style={{
+            position: "absolute",
+            right: "6px",
+            top: "50%",
+            transform: "translateY(-50%)",
+            fontSize: "11px",
+          }}
+        >
+          서명
+        </div>
+      </div>
+    </td>
 
-</div>
-  </td>
+    <td
+      colSpan={2}
+      style={{
+        border: border,
+        height: "26px",
+        textAlign: "center",
+        fontSize: "15px",
+        fontWeight: 700,
+        color,
+        padding: 0,
+      }}
+    >
+      납품자
+    </td>
 
-  <td colSpan={2} style={{ border, height: "26px", textAlign: "center", fontSize: "12px", fontWeight: 900, color, padding: 2 }}>
-    납품자
-  </td>
+    <td
+      colSpan={2}
+      style={{
+        border: border,
+        height: "26px",
+        textAlign: "center",
+        fontSize: "15px",
+        fontWeight: 400,
+        padding: 0,
+      }}
+    >
+      <div style={{ position: "relative", width: "100%", height: "100%" }}>
+        <div
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: "50%",
+            transform: "translate(-50%, -50%)",
+          }}
+        >
+          {supplierSigner || ""}
+        </div>
 
-  <td colSpan={2} style={{ border, height: "26px", textAlign: "center", fontSize: "12px", fontWeight: 700, padding: 0 }}>
-   <div style={{ position: "relative", width: "100%", height: "100%" }}>
+        <div
+          style={{
+            position: "absolute",
+            right: "6px",
+            top: "50%",
+            transform: "translateY(-50%)",
+            fontSize: "11px",
+          }}
+        >
+          서명
+        </div>
+      </div>
+    </td>
 
-  <div
-    style={{
-      position: "absolute",
-      left: "50%",
-      top: "50%",
-      transform: "translate(-50%, -50%)",
-    }}
-  >
-    {supplierSigner || ""}
-  </div>
+    <td
+      style={{
+        border: border,
+        height: "26px",
+        textAlign: "center",
+        fontSize: "15px",
+        fontWeight: 700,
+        color,
+        padding: 0,
+      }}
+    >
+      미수금
+    </td>
 
-  <div
-    style={{
-      position: "absolute",
-      right: "6px",
-      top: "50%",
-      transform: "translateY(-50%)",
-      fontSize: "10px",
-    }}
-  >
-    서명
-  </div>
-
-</div>
-  </td>
-
-  <td style={{ border, height: "26px", textAlign: "center", fontSize: "12px", fontWeight: 900, color, padding: 0 }}>
-    미수금
-  </td>
-
-  <td style={{ border, height: "26px", textAlign: "center", fontSize: "12px", fontWeight: 700, padding: 0 }}>
-    {formatNumber(unpaidAmount || 0)}
-  </td>
-</tr>
-        </tbody>
+    <td
+      style={{
+        border: border,
+        height: "26px",
+        textAlign: "center",
+        fontSize: "15px",
+        fontWeight: 400,
+        padding: 0,
+      }}
+    >
+      {formatNumber(unpaidAmount || 0)}
+    </td>
+  </tr>
+</tbody>
       </table>
     </div>
   );
@@ -1266,7 +1394,7 @@ function StatementPagePreview({
         height: "1414px",
         background: "#ffffff",
         boxSizing: "border-box",
-        padding: "28px",
+        padding: "24px 28px 24px 28px",
       }}
     >
       <div
@@ -1274,8 +1402,10 @@ function StatementPagePreview({
           width: "100%",
           height: "100%",
           display: "grid",
-          gridTemplateRows: "1fr 1fr",
-          gap: "26px",
+          gridTemplateRows: "646px 646px",
+          rowGap: "16px",
+          alignContent: "start",
+          justifyContent: "stretch",
         }}
       >
         <StatementHalfDocument
@@ -1309,7 +1439,6 @@ function StatementPagePreview({
     </div>
   );
 }
-
 const ItemRow = memo(function ItemRow({
   item,
   index,
@@ -2412,42 +2541,106 @@ const resetForm = useCallback(() => {
     URL.revokeObjectURL(url);
   }, [createPdfBlob, statementNumber]);
 
-  const handlePrint = useCallback(async () => {
-    try {
-      if (typeof window === "undefined") return;
+const handlePrint = useCallback(async () => {
+  try {
+    if (typeof window === "undefined") return;
 
-      const pdfBlob = await createPdfBlob();
-      const url = URL.createObjectURL(pdfBlob);
-      const iframe = document.createElement("iframe");
+    const canvases = await renderStatementPageCanvases();
+    const imageUrls = canvases.map((canvas) => canvas.toDataURL("image/png"));
 
-      iframe.style.position = "fixed";
-      iframe.style.right = "0";
-      iframe.style.bottom = "0";
-      iframe.style.width = "0";
-      iframe.style.height = "0";
-      iframe.style.border = "0";
-      iframe.src = url;
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
 
-      iframe.onload = () => {
-        setTimeout(() => {
-          try {
-            iframe.contentWindow?.focus();
-            iframe.contentWindow?.print();
-          } finally {
-            setTimeout(() => {
+    const html = `
+      <!doctype html>
+      <html lang="ko">
+        <head>
+          <meta charset="UTF-8" />
+          <title>거래명세서 인쇄</title>
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 0;
+            }
+
+            html, body {
+              margin: 0;
+              padding: 0;
+              background: #ffffff;
+            }
+
+            body {
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+
+            .page {
+              width: 210mm;
+              min-height: 297mm;
+              margin: 0 auto;
+              page-break-after: always;
+              display: flex;
+              align-items: flex-start;
+              justify-content: center;
+              background: #ffffff;
+            }
+
+            .page:last-child {
+              page-break-after: auto;
+            }
+
+            img {
+              width: 210mm;
+              height: auto;
+              display: block;
+            }
+          </style>
+        </head>
+        <body>
+          ${imageUrls
+            .map(
+              (src) => `
+                <div class="page">
+                  <img src="${src}" />
+                </div>
+              `
+            )
+            .join("")}
+        </body>
+      </html>
+    `;
+
+    iframe.srcdoc = html;
+
+    iframe.onload = () => {
+      setTimeout(() => {
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        } catch (error) {
+          console.error("인쇄 실패:", error);
+          alert("인쇄 중 오류가 발생했습니다.");
+        } finally {
+          setTimeout(() => {
+            if (document.body.contains(iframe)) {
               document.body.removeChild(iframe);
-              URL.revokeObjectURL(url);
-            }, 1000);
-          }
-        }, 300);
-      };
+            }
+          }, 1500);
+        }
+      }, 700);
+    };
 
-      document.body.appendChild(iframe);
-    } catch (error) {
-      console.error("인쇄 실패:", error);
-      alert("인쇄 중 오류가 발생했습니다.");
-    }
-  }, [createPdfBlob]);
+    document.body.appendChild(iframe);
+  } catch (error) {
+    console.error("인쇄 실패:", error);
+    alert("인쇄 중 오류가 발생했습니다.");
+  }
+}, [renderStatementPageCanvases]);
 
   const handleSendEmail = useCallback(async () => {
     try {
