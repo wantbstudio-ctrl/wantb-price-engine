@@ -188,6 +188,30 @@ async function ensureProdServer() {
   });
 }
 
+function isInternalWindowUrl(url) {
+  try {
+    if (!url) return false;
+
+    if (url === "about:blank") return true;
+    if (url.startsWith("devtools://")) return true;
+    if (url.startsWith("file://")) return true;
+    if (url.startsWith("data:")) return true;
+
+    if (
+      url.startsWith("http://localhost:3000") ||
+      url.startsWith("http://127.0.0.1:3000") ||
+      url.startsWith(`http://127.0.0.1:${PROD_PORT}`)
+    ) {
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    writeDebugLog("isInternalWindowUrl 판별 실패", error?.message || error);
+    return false;
+  }
+}
+
 async function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -205,6 +229,25 @@ async function createMainWindow() {
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    writeDebugLog("setWindowOpenHandler url", url);
+
+    if (isInternalWindowUrl(url)) {
+      return {
+        action: "allow",
+        overrideBrowserWindowOptions: {
+          autoHideMenuBar: true,
+          width: 1100,
+          height: 900,
+          backgroundColor: "#ffffff",
+          webPreferences: {
+            contextIsolation: true,
+            nodeIntegration: false,
+            sandbox: false,
+          },
+        },
+      };
+    }
+
     shell.openExternal(url);
     return { action: "deny" };
   });

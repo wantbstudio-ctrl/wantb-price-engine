@@ -34,11 +34,7 @@ type SavedPriceList = {
   title: string;
   priceMode: PriceMode;
   effectiveDate: string;
-  contactName: string;
-  contactPhone: string;
-  contactEmail: string;
   notice: string;
-  saveFolder: string;
   items: PriceItem[];
   createdAt: string;
   updatedAt: string;
@@ -75,23 +71,25 @@ const toNumber = (value: string | number) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const dataURLToBase64 = (dataUrl: string) => {
-  const parts = dataUrl.split(",");
-  return parts.length > 1 ? parts[1] : "";
+const onlyNumberText = (value: string) => value.replace(/[^\d]/g, "");
+
+const formatInputNumber = (value: number) => {
+  if (!Number.isFinite(value) || value === 0) return "";
+  return Math.round(value).toLocaleString("ko-KR");
 };
 
-const blobToUint8Array = async (blob: Blob): Promise<number[]> => {
-  const arrayBuffer = await blob.arrayBuffer();
-  return Array.from(new Uint8Array(arrayBuffer));
-};
+const getInputKey = (rowIndex: number, colIndex: number) =>
+  `${rowIndex}-${colIndex}`;
 
 export default function PriceListPage() {
   const previewRef = useRef<HTMLDivElement | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const cellInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const [company, setCompany] = useState<CompanySettings>({});
   const [savedLists, setSavedLists] = useState<SavedPriceList[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
+  const [isExporting, setIsExporting] = useState(false);
 
   const [documentNumber, setDocumentNumber] = useState("");
   const [title, setTitle] = useState("유통 단가표");
@@ -99,11 +97,7 @@ export default function PriceListPage() {
   const [effectiveDate, setEffectiveDate] = useState(
     new Date().toISOString().slice(0, 10)
   );
-  const [contactName, setContactName] = useState("");
-  const [contactPhone, setContactPhone] = useState("");
-  const [contactEmail, setContactEmail] = useState("");
   const [notice, setNotice] = useState("단가 변동 가능 / 주문 전 최종 확인");
-  const [saveFolder, setSaveFolder] = useState("");
   const [items, setItems] = useState<PriceItem[]>([
     createEmptyItem(),
     createEmptyItem(),
@@ -213,6 +207,70 @@ export default function PriceListPage() {
     );
   };
 
+  const handleNumericInputChange = (
+    itemId: string,
+    key: "quantity" | "wholesalePrice" | "retailPrice",
+    rawValue: string
+  ) => {
+    const cleaned = onlyNumberText(rawValue);
+    updateItem(itemId, key, cleaned === "" ? 0 : Number(cleaned));
+  };
+
+  const focusCell = (rowIndex: number, colIndex: number) => {
+    const key = getInputKey(rowIndex, colIndex);
+    const target = cellInputRefs.current[key];
+    if (target) {
+      target.focus();
+      target.select();
+    }
+  };
+
+  const handleCellKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    rowIndex: number,
+    colIndex: number
+  ) => {
+    const maxRow = items.length - 1;
+    const maxCol = 6;
+
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      focusCell(rowIndex, Math.max(0, colIndex - 1));
+      return;
+    }
+
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      focusCell(rowIndex, Math.min(maxCol, colIndex + 1));
+      return;
+    }
+
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      focusCell(Math.max(0, rowIndex - 1), colIndex);
+      return;
+    }
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      focusCell(Math.min(maxRow, rowIndex + 1), colIndex);
+      return;
+    }
+
+    if (e.key === "Enter") {
+      e.preventDefault();
+
+      if (rowIndex === maxRow) {
+        setItems((prev) => [...prev, createEmptyItem()]);
+        setTimeout(() => {
+          focusCell(rowIndex + 1, colIndex);
+        }, 30);
+      } else {
+        focusCell(rowIndex + 1, colIndex);
+      }
+    }
+  };
+
   const addItem = () => {
     setItems((prev) => [...prev, createEmptyItem()]);
   };
@@ -246,11 +304,7 @@ export default function PriceListPage() {
     setTitle("유통 단가표");
     setPriceMode("wholesale");
     setEffectiveDate(new Date().toISOString().slice(0, 10));
-    setContactName("");
-    setContactPhone("");
-    setContactEmail("");
     setNotice("단가 변동 가능 / 주문 전 최종 확인");
-    setSaveFolder("");
     setItems([createEmptyItem(), createEmptyItem(), createEmptyItem()]);
   };
 
@@ -266,11 +320,7 @@ export default function PriceListPage() {
       title,
       priceMode,
       effectiveDate,
-      contactName,
-      contactPhone,
-      contactEmail,
       notice,
-      saveFolder,
       items,
       createdAt: existing?.createdAt || now,
       updatedAt: now,
@@ -302,11 +352,7 @@ export default function PriceListPage() {
     setTitle(found.title);
     setPriceMode(found.priceMode);
     setEffectiveDate(found.effectiveDate);
-    setContactName(found.contactName);
-    setContactPhone(found.contactPhone);
-    setContactEmail(found.contactEmail);
-    setNotice(found.notice);
-    setSaveFolder(found.saveFolder || "");
+    setNotice(found.notice || "단가 변동 가능 / 주문 전 최종 확인");
     setItems(found.items?.length ? found.items : [createEmptyItem()]);
   };
 
@@ -322,18 +368,6 @@ export default function PriceListPage() {
     }
   };
 
-  const getCanvas = async () => {
-    if (!previewRef.current) {
-      throw new Error("미리보기 영역을 찾을 수 없습니다.");
-    }
-
-    return await html2canvas(previewRef.current, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: "#ffffff",
-    });
-  };
-
   const getSafeBaseName = () => {
     const modeText = priceMode === "wholesale" ? "도매형" : "소매형";
     const dateText = effectiveDate || new Date().toISOString().slice(0, 10);
@@ -345,56 +379,16 @@ export default function PriceListPage() {
     const link = document.createElement("a");
     link.href = url;
     link.download = fileName;
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(url);
+    document.body.removeChild(link);
+
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 1000);
   };
 
-  const saveThroughElectronBase64 = async (
-    dataUrl: string,
-    fileName: string
-  ) => {
-    const electronAPI = (window as any).electronAPI;
-
-    if (!saveFolder || !electronAPI?.saveBase64File) {
-      return false;
-    }
-
-    const result = await electronAPI.saveBase64File({
-      folderPath: saveFolder,
-      fileName,
-      base64Data: dataURLToBase64(dataUrl),
-    });
-
-    if (!result?.success) {
-      throw new Error(result?.error || "파일 저장에 실패했습니다.");
-    }
-
-    return true;
-  };
-
-  const saveThroughElectronBuffer = async (blob: Blob, fileName: string) => {
-    const electronAPI = (window as any).electronAPI;
-
-    if (!saveFolder || !electronAPI?.saveBufferFile) {
-      return false;
-    }
-
-    const buffer = await blobToUint8Array(blob);
-
-    const result = await electronAPI.saveBufferFile({
-      folderPath: saveFolder,
-      fileName,
-      buffer,
-    });
-
-    if (!result?.success) {
-      throw new Error(result?.error || "파일 저장에 실패했습니다.");
-    }
-
-    return true;
-  };
-
-  const createPdfBlob = async () => {
+  const getPageElements = () => {
     if (!previewRef.current) {
       throw new Error("미리보기 영역을 찾을 수 없습니다.");
     }
@@ -407,15 +401,36 @@ export default function PriceListPage() {
       throw new Error("출력 페이지를 찾을 수 없습니다.");
     }
 
+    return pageElements;
+  };
+
+  const renderPageCanvas = async (pageElement: HTMLElement) => {
+    return await html2canvas(pageElement, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+    });
+  };
+
+  const renderAllPageImages = async () => {
+    const pageElements = getPageElements();
+    const images: string[] = [];
+
+    for (let i = 0; i < pageElements.length; i += 1) {
+      const canvas = await renderPageCanvas(pageElements[i]);
+      images.push(canvas.toDataURL("image/png"));
+    }
+
+    return images;
+  };
+
+  const createPdfBlob = async () => {
+    const pageElements = getPageElements();
     const pdf = new jsPDF("p", "mm", "a4");
 
     for (let i = 0; i < pageElements.length; i += 1) {
-      const canvas = await html2canvas(pageElements[i], {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-      });
-
+      const canvas = await renderPageCanvas(pageElements[i]);
       const imgData = canvas.toDataURL("image/jpeg", 1.0);
 
       if (i > 0) {
@@ -430,89 +445,189 @@ export default function PriceListPage() {
 
   const handleSavePNG = async () => {
     try {
-      const canvas = await getCanvas();
-      const dataUrl = canvas.toDataURL("image/png");
-      const fileName = `${getSafeBaseName()}.png`;
+      setIsExporting(true);
 
-      const saved = await saveThroughElectronBase64(dataUrl, fileName);
-      if (!saved) {
+      const pageElements = getPageElements();
+      const baseName = getSafeBaseName();
+
+      for (let i = 0; i < pageElements.length; i += 1) {
+        const canvas = await renderPageCanvas(pageElements[i]);
+        const dataUrl = canvas.toDataURL("image/png");
         const blob = await (await fetch(dataUrl)).blob();
+        const fileName =
+          pageElements.length === 1
+            ? `${baseName}.png`
+            : `${baseName}_페이지${i + 1}.png`;
+
         downloadBlob(blob, fileName);
       }
-
-      alert("PNG 저장이 완료되었습니다.");
     } catch (error) {
       console.error(error);
       alert("PNG 저장 중 오류가 발생했습니다.");
+    } finally {
+      setTimeout(() => {
+        setIsExporting(false);
+      }, 300);
     }
   };
 
   const handleSaveJPG = async () => {
     try {
-      const canvas = await getCanvas();
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
-      const fileName = `${getSafeBaseName()}.jpg`;
+      setIsExporting(true);
 
-      const saved = await saveThroughElectronBase64(dataUrl, fileName);
-      if (!saved) {
+      const pageElements = getPageElements();
+      const baseName = getSafeBaseName();
+
+      for (let i = 0; i < pageElements.length; i += 1) {
+        const canvas = await renderPageCanvas(pageElements[i]);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
         const blob = await (await fetch(dataUrl)).blob();
+        const fileName =
+          pageElements.length === 1
+            ? `${baseName}.jpg`
+            : `${baseName}_페이지${i + 1}.jpg`;
+
         downloadBlob(blob, fileName);
       }
-
-      alert("JPG 저장이 완료되었습니다.");
     } catch (error) {
       console.error(error);
       alert("JPG 저장 중 오류가 발생했습니다.");
+    } finally {
+      setTimeout(() => {
+        setIsExporting(false);
+      }, 300);
     }
   };
 
   const handleSavePDF = async () => {
     try {
+      setIsExporting(true);
+
       const blob = await createPdfBlob();
       const fileName = `${getSafeBaseName()}.pdf`;
 
-      const saved = await saveThroughElectronBuffer(blob, fileName);
-      if (!saved) {
-        downloadBlob(blob, fileName);
-      }
-
-      alert("PDF 저장이 완료되었습니다.");
+      downloadBlob(blob, fileName);
     } catch (error) {
       console.error(error);
       alert("PDF 저장 중 오류가 발생했습니다.");
+    } finally {
+      setTimeout(() => {
+        setIsExporting(false);
+      }, 300);
     }
   };
 
   const handlePrint = async () => {
     try {
-      const blob = await createPdfBlob();
-      const url = URL.createObjectURL(blob);
+      setIsExporting(true);
 
-      const iframe = document.createElement("iframe");
-      iframe.style.position = "fixed";
-      iframe.style.right = "0";
-      iframe.style.bottom = "0";
-      iframe.style.width = "0";
-      iframe.style.height = "0";
-      iframe.style.border = "0";
-      iframe.src = url;
+      const images = await renderAllPageImages();
 
-      document.body.appendChild(iframe);
+      const printWindow = window.open("", "_blank", "width=1000,height=900");
+      if (!printWindow) {
+        alert("인쇄 창을 열지 못했습니다. 팝업 차단 여부를 확인해 주세요.");
+        return;
+      }
 
-      iframe.onload = () => {
-        try {
-          iframe.contentWindow?.focus();
-          iframe.contentWindow?.print();
-        } finally {
-          setTimeout(() => {
-            URL.revokeObjectURL(url);
-            document.body.removeChild(iframe);
-          }, 1000);
-        }
-      };
+      const pageHtml = images
+        .map(
+          (src) => `
+            <div class="page">
+              <img src="${src}" alt="print-page" />
+            </div>
+          `
+        )
+        .join("");
+
+      printWindow.document.open();
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html lang="ko">
+          <head>
+            <meta charset="UTF-8" />
+            <title>${title} 인쇄</title>
+            <style>
+              @page {
+                size: A4;
+                margin: 0;
+              }
+
+              html, body {
+                margin: 0;
+                padding: 0;
+                background: #ffffff;
+              }
+
+              body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+
+              .page {
+                width: 210mm;
+                height: 297mm;
+                margin: 0 auto;
+                page-break-after: always;
+                break-after: page;
+                overflow: hidden;
+              }
+
+              .page:last-child {
+                page-break-after: auto;
+                break-after: auto;
+              }
+
+              .page img {
+                display: block;
+                width: 210mm;
+                height: 297mm;
+                object-fit: fill;
+              }
+
+              @media screen {
+                body {
+                  background: #e5e7eb;
+                  padding: 20px 0;
+                }
+
+                .page {
+                  margin: 0 auto 16px auto;
+                  box-shadow: 0 10px 24px rgba(0,0,0,0.12);
+                }
+              }
+            </style>
+          </head>
+          <body>
+            ${pageHtml}
+            <script>
+              const runPrint = () => {
+                setTimeout(() => {
+                  window.focus();
+                  window.print();
+                }, 700);
+              };
+
+              if (document.readyState === "complete") {
+                runPrint();
+              } else {
+                window.addEventListener("load", runPrint);
+              }
+
+              window.addEventListener("afterprint", () => {
+                setTimeout(() => window.close(), 300);
+              });
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
     } catch (error) {
       console.error(error);
       alert("인쇄 준비 중 오류가 발생했습니다.");
+    } finally {
+      setTimeout(() => {
+        setIsExporting(false);
+      }, 800);
     }
   };
 
@@ -524,9 +639,9 @@ export default function PriceListPage() {
         `문서번호: ${documentNumber}`,
         `기준일: ${effectiveDate}`,
         "",
-        `담당자: ${contactName || company.ceoName || ""}`,
-        `연락처: ${contactPhone || company.phone || ""}`,
-        `이메일: ${contactEmail || company.email || ""}`,
+        `회사명: ${company.companyName || ""}`,
+        `연락처: ${company.phone || ""}`,
+        `이메일: ${company.email || ""}`,
         "",
         `총 품목 수: ${displayItems.length}`,
         `총 수량: ${formatNumber(totalQuantity)}`,
@@ -535,27 +650,6 @@ export default function PriceListPage() {
     );
 
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
-  };
-
-  const handleSelectFolder = async () => {
-    try {
-      const electronAPI = (window as any).electronAPI;
-
-      if (!electronAPI?.selectFolder) {
-        alert(
-          "현재 Electron 폴더 선택 기능이 아직 연결되지 않았습니다. 다음 단계에서 preload/main 연결을 해주면 지정 폴더 저장이 바로 됩니다."
-        );
-        return;
-      }
-
-      const folder = await electronAPI.selectFolder();
-      if (folder) {
-        setSaveFolder(folder);
-      }
-    } catch (error) {
-      console.error(error);
-      alert("폴더 선택 중 오류가 발생했습니다.");
-    }
   };
 
   return (
@@ -635,63 +729,6 @@ export default function PriceListPage() {
                 />
               </div>
 
-              <div>
-                <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                  담당자명
-                </label>
-                <input
-                  value={contactName}
-                  onChange={(e) => setContactName(e.target.value)}
-                  placeholder="예: 방원우"
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-gray-500"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                  연락처
-                </label>
-                <input
-                  value={contactPhone}
-                  onChange={(e) => setContactPhone(e.target.value)}
-                  placeholder="예: 010-1234-5678"
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-gray-500"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                  이메일
-                </label>
-                <input
-                  value={contactEmail}
-                  onChange={(e) => setContactEmail(e.target.value)}
-                  placeholder="예: info@company.com"
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-gray-500"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                  저장 폴더
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    value={saveFolder}
-                    readOnly
-                    placeholder="저장 폴더를 선택하세요"
-                    className="min-w-0 flex-1 rounded-xl border border-gray-300 bg-gray-50 px-3 py-2.5 text-sm outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSelectFolder}
-                    className="w-[104px] shrink-0 rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                  >
-                    폴더 선택
-                  </button>
-                </div>
-              </div>
-
               <div className="col-span-2">
                 <label className="mb-1.5 block text-sm font-semibold text-gray-700">
                   안내 문구
@@ -711,7 +748,7 @@ export default function PriceListPage() {
               <div>
                 <h2 className="text-lg font-bold text-gray-900">품목 입력</h2>
                 <p className="text-sm text-gray-500">
-                  카드형이 아니라 엑셀형 표 입력 구조로 정리했습니다.
+                  방향키(← → ↑ ↓)와 Enter로 행/칸 이동이 가능합니다.
                 </p>
               </div>
 
@@ -726,7 +763,7 @@ export default function PriceListPage() {
 
             <div className="overflow-hidden rounded-2xl border border-gray-200">
               <div className="max-h-[540px] overflow-auto">
-                <table className="w-full min-w-[900px] border-collapse">
+                <table className="w-full min-w-[940px] border-collapse">
                   <thead className="sticky top-0 z-10 bg-gray-900 text-white">
                     <tr>
                       <th className="w-[58px] px-2 py-2 text-center text-[11px] font-semibold">
@@ -741,16 +778,16 @@ export default function PriceListPage() {
                       <th className="w-[56px] px-2 py-2 text-left text-[11px] font-semibold">
                         단위
                       </th>
-                      <th className="w-[58px] px-2 py-2 text-right text-[11px] font-semibold">
+                      <th className="w-[70px] px-2 py-2 text-right text-[11px] font-semibold">
                         수량
                       </th>
-                      <th className="w-[74px] px-2 py-2 text-right text-[11px] font-semibold">
+                      <th className="w-[92px] px-2 py-2 text-right text-[11px] font-semibold">
                         도매가
                       </th>
-                      <th className="w-[74px] px-2 py-2 text-right text-[11px] font-semibold">
+                      <th className="w-[92px] px-2 py-2 text-right text-[11px] font-semibold">
                         소매가
                       </th>
-                      <th className="w-[120px] px-2 py-2 text-left text-[11px] font-semibold">
+                      <th className="w-[140px] px-2 py-2 text-left text-[11px] font-semibold">
                         비고
                       </th>
                       <th className="w-[64px] px-2 py-2 text-center text-[11px] font-semibold">
@@ -760,10 +797,10 @@ export default function PriceListPage() {
                   </thead>
 
                   <tbody>
-                    {items.map((item, index) => (
+                    {items.map((item, rowIndex) => (
                       <tr
                         key={item.id}
-                        className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                        className={rowIndex % 2 === 0 ? "bg-white" : "bg-gray-50"}
                       >
                         <td className="border-t border-gray-200 px-2 py-1.5 align-middle">
                           <div
@@ -795,10 +832,14 @@ export default function PriceListPage() {
 
                         <td className="border-t border-gray-200 px-2 py-1.5">
                           <input
+                            ref={(el) => {
+                              cellInputRefs.current[getInputKey(rowIndex, 0)] = el;
+                            }}
                             value={item.name}
                             onChange={(e) =>
                               updateItem(item.id, "name", e.target.value)
                             }
+                            onKeyDown={(e) => handleCellKeyDown(e, rowIndex, 0)}
                             placeholder="제품명"
                             className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-[12px] outline-none focus:border-gray-500"
                           />
@@ -806,10 +847,14 @@ export default function PriceListPage() {
 
                         <td className="border-t border-gray-200 px-2 py-1.5">
                           <input
+                            ref={(el) => {
+                              cellInputRefs.current[getInputKey(rowIndex, 1)] = el;
+                            }}
                             value={item.spec}
                             onChange={(e) =>
                               updateItem(item.id, "spec", e.target.value)
                             }
+                            onKeyDown={(e) => handleCellKeyDown(e, rowIndex, 1)}
                             placeholder="규격"
                             className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-[12px] outline-none focus:border-gray-500"
                           />
@@ -817,10 +862,14 @@ export default function PriceListPage() {
 
                         <td className="border-t border-gray-200 px-2 py-1.5">
                           <input
+                            ref={(el) => {
+                              cellInputRefs.current[getInputKey(rowIndex, 2)] = el;
+                            }}
                             value={item.unit}
                             onChange={(e) =>
                               updateItem(item.id, "unit", e.target.value)
                             }
+                            onKeyDown={(e) => handleCellKeyDown(e, rowIndex, 2)}
                             placeholder="BOX"
                             className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-[12px] outline-none focus:border-gray-500"
                           />
@@ -828,43 +877,77 @@ export default function PriceListPage() {
 
                         <td className="border-t border-gray-200 px-2 py-1.5">
                           <input
-                            type="number"
-                            value={item.quantity}
+                            ref={(el) => {
+                              cellInputRefs.current[getInputKey(rowIndex, 3)] = el;
+                            }}
+                            type="text"
+                            inputMode="numeric"
+                            value={formatInputNumber(item.quantity)}
                             onChange={(e) =>
-                              updateItem(item.id, "quantity", e.target.value)
+                              handleNumericInputChange(
+                                item.id,
+                                "quantity",
+                                e.target.value
+                              )
                             }
+                            onKeyDown={(e) => handleCellKeyDown(e, rowIndex, 3)}
+                            placeholder="0"
                             className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-right text-[12px] outline-none focus:border-gray-500"
                           />
                         </td>
 
                         <td className="border-t border-gray-200 px-2 py-1.5">
                           <input
-                            type="number"
-                            value={item.wholesalePrice}
+                            ref={(el) => {
+                              cellInputRefs.current[getInputKey(rowIndex, 4)] = el;
+                            }}
+                            type="text"
+                            inputMode="numeric"
+                            value={formatInputNumber(item.wholesalePrice)}
                             onChange={(e) =>
-                              updateItem(item.id, "wholesalePrice", e.target.value)
+                              handleNumericInputChange(
+                                item.id,
+                                "wholesalePrice",
+                                e.target.value
+                              )
                             }
+                            onKeyDown={(e) => handleCellKeyDown(e, rowIndex, 4)}
+                            placeholder="0"
                             className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-right text-[12px] outline-none focus:border-gray-500"
                           />
                         </td>
 
                         <td className="border-t border-gray-200 px-2 py-1.5">
                           <input
-                            type="number"
-                            value={item.retailPrice}
+                            ref={(el) => {
+                              cellInputRefs.current[getInputKey(rowIndex, 5)] = el;
+                            }}
+                            type="text"
+                            inputMode="numeric"
+                            value={formatInputNumber(item.retailPrice)}
                             onChange={(e) =>
-                              updateItem(item.id, "retailPrice", e.target.value)
+                              handleNumericInputChange(
+                                item.id,
+                                "retailPrice",
+                                e.target.value
+                              )
                             }
+                            onKeyDown={(e) => handleCellKeyDown(e, rowIndex, 5)}
+                            placeholder="0"
                             className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-right text-[12px] outline-none focus:border-gray-500"
                           />
                         </td>
 
                         <td className="border-t border-gray-200 px-2 py-1.5">
                           <input
+                            ref={(el) => {
+                              cellInputRefs.current[getInputKey(rowIndex, 6)] = el;
+                            }}
                             value={item.note}
                             onChange={(e) =>
                               updateItem(item.id, "note", e.target.value)
                             }
+                            onKeyDown={(e) => handleCellKeyDown(e, rowIndex, 6)}
                             placeholder="비고"
                             className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-[12px] outline-none focus:border-gray-500"
                           />
@@ -921,21 +1004,24 @@ export default function PriceListPage() {
               <button
                 type="button"
                 onClick={handleSavePNG}
-                className="rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-800"
+                disabled={isExporting}
+                className="rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 PNG 저장
               </button>
               <button
                 type="button"
                 onClick={handleSaveJPG}
-                className="rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-800"
+                disabled={isExporting}
+                className="rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 JPG 저장
               </button>
               <button
                 type="button"
                 onClick={handleSavePDF}
-                className="rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-800"
+                disabled={isExporting}
+                className="rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 PDF 저장
               </button>
@@ -949,7 +1035,8 @@ export default function PriceListPage() {
               <button
                 type="button"
                 onClick={handlePrint}
-                className="rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-800"
+                disabled={isExporting}
+                className="rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 인쇄
               </button>
@@ -1050,7 +1137,7 @@ export default function PriceListPage() {
                     <div
                       key={`page-${pageIndex}`}
                       data-price-page="true"
-                      className="mx-auto w-[794px] h-[1123px] overflow-hidden bg-white shadow-[0_12px_30px_rgba(0,0,0,0.08)]"
+                      className="mx-auto h-[1123px] w-[794px] overflow-hidden bg-white shadow-[0_12px_30px_rgba(0,0,0,0.08)]"
                     >
                       <div className="flex h-full flex-col">
                         {isFirstPage ? (
@@ -1083,7 +1170,7 @@ export default function PriceListPage() {
 
                               <div className="text-right text-[10px] leading-4 text-gray-500">
                                 <div>{company.companyName || "회사명"}</div>
-                                <div>{contactPhone || company.phone || "-"}</div>
+                                <div>{company.phone || "-"}</div>
                                 <div>{notice}</div>
                               </div>
                             </div>
@@ -1198,7 +1285,10 @@ export default function PriceListPage() {
                                 {Array.from({
                                   length: targetCount - pageItems.length,
                                 }).map((_, index) => (
-                                  <tr key={`empty-${pageIndex}-${index}`} className="bg-white">
+                                  <tr
+                                    key={`empty-${pageIndex}-${index}`}
+                                    className="bg-white"
+                                  >
                                     <td className="border-t border-gray-200 px-2 py-[11px]" />
                                     <td className="border-t border-gray-200 px-2 py-[11px]" />
                                     <td className="border-t border-gray-200 px-2 py-[11px]" />
@@ -1218,7 +1308,7 @@ export default function PriceListPage() {
                           <div className="flex items-center justify-between">
                             <div className="text-[10px] text-gray-500">
                               {isFirstPage
-                                ? `${company.companyName || "회사명"} · ${contactPhone || company.phone || "-"}`
+                                ? `${company.companyName || "회사명"} · ${company.phone || "-"}`
                                 : `${company.companyName || "회사명"} · 가격표 계속`}
                             </div>
 
