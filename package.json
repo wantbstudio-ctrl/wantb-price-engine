@@ -9,52 +9,51 @@
     "start": "next start -p 3000",
     "lint": "next lint",
     "electron": "electron .",
-    "electron-dev": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && electron .\"",
-    "dist": "npm run build && electron-builder"
+    "electron-dev": "electron .",
+    "dist": "npm run build && electron-builder",
+    "pack": "npm run build && electron-builder --dir"
   },
   "dependencies": {
-    "electron-is-dev": "^3.0.1",
-    "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1",
     "next": "14.2.5",
-    "react": "^18",
-    "react-dom": "^18"
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
   },
   "devDependencies": {
-    "@types/node": "^20",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
-    "autoprefixer": "^10.4.19",
-    "concurrently": "^8.2.2",
-    "electron": "^30.0.9",
+    "concurrently": "^9.0.1",
+    "electron": "^31.7.7",
     "electron-builder": "^24.13.3",
-    "postcss": "^8.4.38",
-    "tailwindcss": "^3.4.4",
-    "typescript": "^5",
-    "wait-on": "^7.2.0"
+    "typescript": "^5.5.4",
+    "@types/node": "^22.7.4",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13"
   },
   "build": {
     "appId": "com.wantb.priceengine",
     "productName": "WantB Price Engine",
-    "forceCodeSigning": false,
     "files": [
       ".next/**/*",
       "app/**/*",
       "components/**/*",
-      "electron/**/*",
       "public/**/*",
+      "electron/**/*",
       "package.json",
-      "next.config.js"
+      "next.config.js",
+      "postcss.config.js",
+      "tailwind.config.js",
+      "tsconfig.json"
     ],
-    "win": {
-      "target": "nsis",
-      "sign": false
+    "directories": {
+      "output": "dist"
     },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
     }
   }
 }

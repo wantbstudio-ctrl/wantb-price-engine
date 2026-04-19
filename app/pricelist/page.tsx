@@ -35,6 +35,9 @@ type SavedPriceList = {
   priceMode: PriceMode;
   effectiveDate: string;
   notice: string;
+  clientName?: string;
+  clientManager?: string;
+  clientPhone?: string;
   items: PriceItem[];
   createdAt: string;
   updatedAt: string;
@@ -45,8 +48,8 @@ const SEQ_KEY = "wantb-price-list-seq";
 const CURRENT_NUMBER_KEY = "wantb-current-price-list-number";
 const COMPANY_KEY = "wantb-company-settings";
 
-const ITEMS_PER_FIRST_PAGE = 15;
-const ITEMS_PER_NEXT_PAGE = 18;
+const ITEMS_PER_FIRST_PAGE = 12;
+const ITEMS_PER_NEXT_PAGE = 12;
 
 const createEmptyItem = (): PriceItem => ({
   id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -81,6 +84,10 @@ const formatInputNumber = (value: number) => {
 const getInputKey = (rowIndex: number, colIndex: number) =>
   `${rowIndex}-${colIndex}`;
 
+const EDITABLE_COLUMN_KEYS: Array<
+  "name" | "spec" | "unit" | "quantity" | "wholesalePrice" | "retailPrice" | "note"
+> = ["name", "spec", "unit", "quantity", "wholesalePrice", "retailPrice", "note"];
+
 export default function PriceListPage() {
   const previewRef = useRef<HTMLDivElement | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -90,6 +97,7 @@ export default function PriceListPage() {
   const [savedLists, setSavedLists] = useState<SavedPriceList[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
   const [isExporting, setIsExporting] = useState(false);
+  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
 
   const [documentNumber, setDocumentNumber] = useState("");
   const [title, setTitle] = useState("유통 단가표");
@@ -98,6 +106,11 @@ export default function PriceListPage() {
     new Date().toISOString().slice(0, 10)
   );
   const [notice, setNotice] = useState("단가 변동 가능 / 주문 전 최종 확인");
+
+  const [clientName, setClientName] = useState("");
+  const [clientManager, setClientManager] = useState("");
+  const [clientPhone, setClientPhone] = useState("");
+
   const [items, setItems] = useState<PriceItem[]>([
     createEmptyItem(),
     createEmptyItem(),
@@ -154,14 +167,6 @@ export default function PriceListPage() {
     });
   }, [items, priceMode]);
 
-  const totalQuantity = useMemo(() => {
-    return displayItems.reduce((sum, item) => sum + item.quantity, 0);
-  }, [displayItems]);
-
-  const totalAmount = useMemo(() => {
-    return displayItems.reduce((sum, item) => sum + item.amount, 0);
-  }, [displayItems]);
-
   const pagedItems = useMemo(() => {
     if (displayItems.length <= ITEMS_PER_FIRST_PAGE) {
       return [displayItems];
@@ -177,6 +182,9 @@ export default function PriceListPage() {
 
     return [firstPage, ...nextPages];
   }, [displayItems]);
+
+  const allRowsSelected =
+    items.length > 0 && selectedRowIds.length === items.length;
 
   const persistSavedLists = (next: SavedPriceList[]) => {
     setSavedLists(next);
@@ -271,8 +279,110 @@ export default function PriceListPage() {
     }
   };
 
-  const addItem = () => {
+  const handleCellPaste = (
+    e: React.ClipboardEvent<HTMLInputElement>,
+    startRowIndex: number,
+    startColIndex: number
+  ) => {
+    const pastedText = e.clipboardData.getData("text");
+    if (!pastedText.trim()) return;
+
+    e.preventDefault();
+
+    const rows = pastedText
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n")
+      .split("\n")
+      .filter((row) => row.trim() !== "");
+
+    if (!rows.length) return;
+
+    const parsedRows = rows.map((row) => row.split("\t"));
+
+    setItems((prev) => {
+      const nextItems = [...prev];
+      const requiredLength = startRowIndex + parsedRows.length;
+
+      while (nextItems.length < requiredLength) {
+        nextItems.push(createEmptyItem());
+      }
+
+      parsedRows.forEach((cells, pastedRowOffset) => {
+        const targetRowIndex = startRowIndex + pastedRowOffset;
+        const currentItem = nextItems[targetRowIndex];
+
+        if (!currentItem) return;
+
+        const updatedItem: PriceItem = { ...currentItem };
+
+        cells.forEach((cellValue, pastedColOffset) => {
+          const targetColIndex = startColIndex + pastedColOffset;
+          if (targetColIndex < 0 || targetColIndex >= EDITABLE_COLUMN_KEYS.length) {
+            return;
+          }
+
+          const targetKey = EDITABLE_COLUMN_KEYS[targetColIndex];
+          const trimmedValue = cellValue.trim();
+
+          if (
+            targetKey === "quantity" ||
+            targetKey === "wholesalePrice" ||
+            targetKey === "retailPrice"
+          ) {
+            updatedItem[targetKey] = trimmedValue === "" ? 0 : toNumber(trimmedValue);
+          } else {
+            updatedItem[targetKey] = trimmedValue;
+          }
+        });
+
+        nextItems[targetRowIndex] = updatedItem;
+      });
+
+      return nextItems;
+    });
+
+    const lastRowIndex = startRowIndex + parsedRows.length - 1;
+    const lastColumnLength = parsedRows[parsedRows.length - 1]?.length ?? 1;
+    const lastColIndex = Math.min(
+      6,
+      startColIndex + Math.max(0, lastColumnLength - 1)
+    );
+
+    setTimeout(() => {
+      focusCell(lastRowIndex, lastColIndex);
+    }, 50);
+  };
+
+  const addItem = (focusToNewRow = false) => {
+    const nextRowIndex = items.length;
     setItems((prev) => [...prev, createEmptyItem()]);
+
+    if (focusToNewRow) {
+      setTimeout(() => {
+        focusCell(nextRowIndex, 0);
+      }, 30);
+    }
+  };
+
+  const duplicateItem = (itemId: string) => {
+    const sourceIndex = items.findIndex((item) => item.id === itemId);
+    if (sourceIndex < 0) return;
+
+    const sourceItem = items[sourceIndex];
+    const duplicatedItem: PriceItem = {
+      ...sourceItem,
+      id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    };
+
+    setItems((prev) => {
+      const next = [...prev];
+      next.splice(sourceIndex + 1, 0, duplicatedItem);
+      return next;
+    });
+
+    setTimeout(() => {
+      focusCell(sourceIndex + 1, 0);
+    }, 30);
   };
 
   const removeItem = (itemId: string) => {
@@ -282,6 +392,70 @@ export default function PriceListPage() {
       }
       return prev.filter((item) => item.id !== itemId);
     });
+
+    setSelectedRowIds((prev) => prev.filter((id) => id !== itemId));
+  };
+
+  const toggleRowSelection = (itemId: string) => {
+    setSelectedRowIds((prev) =>
+      prev.includes(itemId)
+        ? prev.filter((id) => id !== itemId)
+        : [...prev, itemId]
+    );
+  };
+
+  const toggleSelectAllRows = () => {
+    if (allRowsSelected) {
+      setSelectedRowIds([]);
+      return;
+    }
+    setSelectedRowIds(items.map((item) => item.id));
+  };
+
+  const deleteSelectedRows = () => {
+    if (selectedRowIds.length === 0) {
+      alert("삭제할 행을 먼저 선택해 주세요.");
+      return;
+    }
+
+    const ok = window.confirm(
+      `선택한 ${selectedRowIds.length}개 행을 삭제하시겠습니까?`
+    );
+    if (!ok) return;
+
+    setItems((prev) => {
+      const next = prev.filter((item) => !selectedRowIds.includes(item.id));
+      return next.length > 0 ? next : [createEmptyItem()];
+    });
+
+    setSelectedRowIds([]);
+  };
+
+  const isRowEmpty = (item: PriceItem) => {
+    return (
+      !item.image &&
+      item.name.trim() === "" &&
+      item.spec.trim() === "" &&
+      item.unit.trim() === "" &&
+      item.quantity === 0 &&
+      item.wholesalePrice === 0 &&
+      item.retailPrice === 0 &&
+      item.note.trim() === ""
+    );
+  };
+
+  const clearEmptyRows = () => {
+    setItems((prev) => {
+      const next = prev.filter((item) => !isRowEmpty(item));
+      return next.length > 0 ? next : [createEmptyItem()];
+    });
+
+    setSelectedRowIds((prev) =>
+      prev.filter((id) => {
+        const item = items.find((row) => row.id === id);
+        return item ? !isRowEmpty(item) : false;
+      })
+    );
   };
 
   const handleImageUpload = (itemId: string, file?: File | null) => {
@@ -300,11 +474,15 @@ export default function PriceListPage() {
     localStorage.setItem(CURRENT_NUMBER_KEY, nextNumber);
 
     setSelectedId("");
+    setSelectedRowIds([]);
     setDocumentNumber(nextNumber);
     setTitle("유통 단가표");
     setPriceMode("wholesale");
     setEffectiveDate(new Date().toISOString().slice(0, 10));
     setNotice("단가 변동 가능 / 주문 전 최종 확인");
+    setClientName("");
+    setClientManager("");
+    setClientPhone("");
     setItems([createEmptyItem(), createEmptyItem(), createEmptyItem()]);
   };
 
@@ -321,6 +499,9 @@ export default function PriceListPage() {
       priceMode,
       effectiveDate,
       notice,
+      clientName,
+      clientManager,
+      clientPhone,
       items,
       createdAt: existing?.createdAt || now,
       updatedAt: now,
@@ -348,11 +529,15 @@ export default function PriceListPage() {
     if (!found) return;
 
     setSelectedId(found.id);
+    setSelectedRowIds([]);
     setDocumentNumber(found.documentNumber);
     setTitle(found.title);
     setPriceMode(found.priceMode);
     setEffectiveDate(found.effectiveDate);
     setNotice(found.notice || "단가 변동 가능 / 주문 전 최종 확인");
+    setClientName(found.clientName || "");
+    setClientManager(found.clientManager || "");
+    setClientPhone(found.clientPhone || "");
     setItems(found.items?.length ? found.items : [createEmptyItem()]);
   };
 
@@ -639,13 +824,15 @@ export default function PriceListPage() {
         `문서번호: ${documentNumber}`,
         `기준일: ${effectiveDate}`,
         "",
+        `거래처 상호: ${clientName || ""}`,
+        `담당자: ${clientManager || ""}`,
+        `연락처: ${clientPhone || ""}`,
+        "",
         `회사명: ${company.companyName || ""}`,
-        `연락처: ${company.phone || ""}`,
-        `이메일: ${company.email || ""}`,
+        `회사 연락처: ${company.phone || ""}`,
+        `회사 이메일: ${company.email || ""}`,
         "",
         `총 품목 수: ${displayItems.length}`,
-        `총 수량: ${formatNumber(totalQuantity)}`,
-        `총 금액: ${formatNumber(totalAmount)}원`,
       ].join("\n")
     );
 
@@ -729,6 +916,42 @@ export default function PriceListPage() {
                 />
               </div>
 
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                  거래처 상호
+                </label>
+                <input
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                  placeholder="상호"
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-gray-500"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                  담당자
+                </label>
+                <input
+                  value={clientManager}
+                  onChange={(e) => setClientManager(e.target.value)}
+                  placeholder="담당자"
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-gray-500"
+                />
+              </div>
+
+              <div className="col-span-2">
+                <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                  전화번호
+                </label>
+                <input
+                  value={clientPhone}
+                  onChange={(e) => setClientPhone(e.target.value)}
+                  placeholder="전화번호"
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-gray-500"
+                />
+              </div>
+
               <div className="col-span-2">
                 <label className="mb-1.5 block text-sm font-semibold text-gray-700">
                   안내 문구
@@ -744,28 +967,59 @@ export default function PriceListPage() {
           </div>
 
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="mb-3 flex items-center justify-between">
+            <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-bold text-gray-900">품목 입력</h2>
                 <p className="text-sm text-gray-500">
-                  방향키(← → ↑ ↓)와 Enter로 행/칸 이동이 가능합니다.
+                  방향키(← → ↑ ↓), Tab, Enter, 엑셀 복붙을 지원합니다.
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={addItem}
-                className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
-              >
-                품목 추가
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => addItem(true)}
+                  className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+                >
+                  품목 추가
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleSelectAllRows}
+                  className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800"
+                >
+                  {allRowsSelected ? "전체 해제" : "전체 선택"}
+                </button>
+                <button
+                  type="button"
+                  onClick={deleteSelectedRows}
+                  className="rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-600"
+                >
+                  선택 삭제
+                </button>
+                <button
+                  type="button"
+                  onClick={clearEmptyRows}
+                  className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800"
+                >
+                  빈 행 정리
+                </button>
+              </div>
+            </div>
+
+            <div className="mb-3 rounded-xl bg-gray-50 px-4 py-3 text-xs leading-5 text-gray-600">
+              선택 체크 후 일괄 삭제가 가능하며, 각 행의 <span className="font-semibold">복제</span> 버튼으로
+              바로 아래 줄에 같은 품목을 복사할 수 있습니다.
             </div>
 
             <div className="overflow-hidden rounded-2xl border border-gray-200">
               <div className="max-h-[540px] overflow-auto">
-                <table className="w-full min-w-[940px] border-collapse">
+                <table className="w-full min-w-[1100px] border-collapse">
                   <thead className="sticky top-0 z-10 bg-gray-900 text-white">
                     <tr>
+                      <th className="w-[52px] px-2 py-2 text-center text-[11px] font-semibold">
+                        선택
+                      </th>
                       <th className="w-[58px] px-2 py-2 text-center text-[11px] font-semibold">
                         이미지
                       </th>
@@ -790,6 +1044,9 @@ export default function PriceListPage() {
                       <th className="w-[140px] px-2 py-2 text-left text-[11px] font-semibold">
                         비고
                       </th>
+                      <th className="w-[62px] px-2 py-2 text-center text-[11px] font-semibold">
+                        복제
+                      </th>
                       <th className="w-[64px] px-2 py-2 text-center text-[11px] font-semibold">
                         삭제
                       </th>
@@ -800,8 +1057,23 @@ export default function PriceListPage() {
                     {items.map((item, rowIndex) => (
                       <tr
                         key={item.id}
-                        className={rowIndex % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                        className={
+                          selectedRowIds.includes(item.id)
+                            ? "bg-blue-50"
+                            : rowIndex % 2 === 0
+                            ? "bg-white"
+                            : "bg-gray-50"
+                        }
                       >
+                        <td className="border-t border-gray-200 px-2 py-1.5 text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedRowIds.includes(item.id)}
+                            onChange={() => toggleRowSelection(item.id)}
+                            className="h-4 w-4 cursor-pointer rounded border-gray-300"
+                          />
+                        </td>
+
                         <td className="border-t border-gray-200 px-2 py-1.5 align-middle">
                           <div
                             className="mx-auto flex h-[36px] w-[36px] cursor-pointer items-center justify-center overflow-hidden rounded-md border border-gray-200 bg-white text-[9px] text-gray-500"
@@ -840,6 +1112,7 @@ export default function PriceListPage() {
                               updateItem(item.id, "name", e.target.value)
                             }
                             onKeyDown={(e) => handleCellKeyDown(e, rowIndex, 0)}
+                            onPaste={(e) => handleCellPaste(e, rowIndex, 0)}
                             placeholder="제품명"
                             className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-[12px] outline-none focus:border-gray-500"
                           />
@@ -855,6 +1128,7 @@ export default function PriceListPage() {
                               updateItem(item.id, "spec", e.target.value)
                             }
                             onKeyDown={(e) => handleCellKeyDown(e, rowIndex, 1)}
+                            onPaste={(e) => handleCellPaste(e, rowIndex, 1)}
                             placeholder="규격"
                             className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-[12px] outline-none focus:border-gray-500"
                           />
@@ -870,6 +1144,7 @@ export default function PriceListPage() {
                               updateItem(item.id, "unit", e.target.value)
                             }
                             onKeyDown={(e) => handleCellKeyDown(e, rowIndex, 2)}
+                            onPaste={(e) => handleCellPaste(e, rowIndex, 2)}
                             placeholder="BOX"
                             className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-[12px] outline-none focus:border-gray-500"
                           />
@@ -891,6 +1166,7 @@ export default function PriceListPage() {
                               )
                             }
                             onKeyDown={(e) => handleCellKeyDown(e, rowIndex, 3)}
+                            onPaste={(e) => handleCellPaste(e, rowIndex, 3)}
                             placeholder="0"
                             className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-right text-[12px] outline-none focus:border-gray-500"
                           />
@@ -912,6 +1188,7 @@ export default function PriceListPage() {
                               )
                             }
                             onKeyDown={(e) => handleCellKeyDown(e, rowIndex, 4)}
+                            onPaste={(e) => handleCellPaste(e, rowIndex, 4)}
                             placeholder="0"
                             className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-right text-[12px] outline-none focus:border-gray-500"
                           />
@@ -933,6 +1210,7 @@ export default function PriceListPage() {
                               )
                             }
                             onKeyDown={(e) => handleCellKeyDown(e, rowIndex, 5)}
+                            onPaste={(e) => handleCellPaste(e, rowIndex, 5)}
                             placeholder="0"
                             className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-right text-[12px] outline-none focus:border-gray-500"
                           />
@@ -948,9 +1226,20 @@ export default function PriceListPage() {
                               updateItem(item.id, "note", e.target.value)
                             }
                             onKeyDown={(e) => handleCellKeyDown(e, rowIndex, 6)}
+                            onPaste={(e) => handleCellPaste(e, rowIndex, 6)}
                             placeholder="비고"
                             className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-[12px] outline-none focus:border-gray-500"
                           />
+                        </td>
+
+                        <td className="border-t border-gray-200 px-2 py-1.5 text-center">
+                          <button
+                            type="button"
+                            onClick={() => duplicateItem(item.id)}
+                            className="w-[50px] rounded-md border border-blue-200 px-2 py-1 text-[11px] font-semibold text-blue-600"
+                          >
+                            복제
+                          </button>
                         </td>
 
                         <td className="border-t border-gray-200 px-2 py-1.5 text-center">
@@ -968,6 +1257,8 @@ export default function PriceListPage() {
                     {items.length < 12 &&
                       Array.from({ length: 12 - items.length }).map((_, index) => (
                         <tr key={`empty-row-${index}`} className="bg-white">
+                          <td className="border-t border-gray-200 px-2 py-[11px]" />
+                          <td className="border-t border-gray-200 px-2 py-[11px]" />
                           <td className="border-t border-gray-200 px-2 py-[11px]" />
                           <td className="border-t border-gray-200 px-2 py-[11px]" />
                           <td className="border-t border-gray-200 px-2 py-[11px]" />
@@ -1084,6 +1375,11 @@ export default function PriceListPage() {
                           {saved.priceMode === "wholesale" ? "도매가" : "소매가"} ·{" "}
                           {saved.effectiveDate}
                         </div>
+                        {saved.clientName ? (
+                          <div className="mt-1 text-xs text-gray-500">
+                            거래처: {saved.clientName}
+                          </div>
+                        ) : null}
                       </div>
 
                       <div className="flex gap-2">
@@ -1116,7 +1412,7 @@ export default function PriceListPage() {
               <div>
                 <h2 className="text-lg font-bold text-gray-900">출력 미리보기</h2>
                 <p className="text-sm text-gray-500">
-                  고밀도 유통 단가표 구조입니다. 1페이지 품목 15칸 기준.
+                  고밀도 유통 단가표 구조입니다. 페이지당 품목 12칸 기준이며, 품목 수에 따라 다음 페이지로 이어집니다.
                 </p>
               </div>
 
@@ -1139,192 +1435,189 @@ export default function PriceListPage() {
                       data-price-page="true"
                       className="mx-auto h-[1123px] w-[794px] overflow-hidden bg-white shadow-[0_12px_30px_rgba(0,0,0,0.08)]"
                     >
-                      <div className="flex h-full flex-col">
-                        {isFirstPage ? (
-                          <div className="border-b border-gray-200 px-7 py-4">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
-                                  {company.logoDataUrl ? (
-                                    <img
-                                      src={company.logoDataUrl}
-                                      alt="회사 로고"
-                                      className="h-full w-full object-contain"
-                                    />
-                                  ) : (
-                                    <span className="text-[9px] text-gray-400">
-                                      LOGO
-                                    </span>
-                                  )}
-                                </div>
+                      <div className="flex h-full w-full items-start justify-center overflow-hidden bg-white">
+                        <div
+                          style={{
+                            width: "794px",
+                            height: "1123px",
+                            transform: "scale(0.93)",
+                            transformOrigin: "top center",
+                          }}
+                          className="bg-white"
+                        >
+                          <div className="flex h-full flex-col">
+                            {isFirstPage ? (
+                              <div className="border-b border-gray-300 px-7 py-4">
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex items-center gap-4">
+                                    <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-white">
+                                      {company.logoDataUrl ? (
+                                        <img
+                                          src={company.logoDataUrl}
+                                          alt="회사 로고"
+                                          className="h-full w-full object-contain"
+                                        />
+                                      ) : (
+                                        <span className="text-[9px] text-gray-400">
+                                          LOGO
+                                        </span>
+                                      )}
+                                    </div>
 
-                                <div>
-                                  <div className="text-[18px] font-bold tracking-tight text-gray-900">
-                                    {title}
-                                  </div>
-                                  <div className="text-[10px] text-gray-500">
-                                    {documentNumber} · {effectiveDate}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="text-right text-[10px] leading-4 text-gray-500">
-                                <div>{company.companyName || "회사명"}</div>
-                                <div>{company.phone || "-"}</div>
-                                <div>{notice}</div>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="border-b border-gray-200 px-7 py-3">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <div className="text-[14px] font-bold text-gray-900">
-                                  {title}
-                                </div>
-                                <div className="text-[9px] text-gray-500">
-                                  {company.companyName || "회사명"} · {effectiveDate}
-                                </div>
-                              </div>
-
-                              <div className="text-[9px] text-gray-400">
-                                Page {pageIndex + 1}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="flex-1 px-7 py-4">
-                          <div className="overflow-hidden rounded-xl border border-gray-200">
-                            <table className="w-full table-fixed border-collapse">
-                              <thead>
-                                <tr className="bg-gray-900 text-white">
-                                  <th className="w-[68px] px-2 py-2 text-center text-[11px] font-semibold">
-                                    이미지
-                                  </th>
-                                  <th className="w-[210px] px-2 py-2 text-left text-[11px] font-semibold">
-                                    제품명
-                                  </th>
-                                  <th className="w-[95px] px-2 py-2 text-left text-[11px] font-semibold">
-                                    규격
-                                  </th>
-                                  <th className="w-[52px] px-2 py-2 text-center text-[11px] font-semibold">
-                                    단위
-                                  </th>
-                                  <th className="w-[58px] px-2 py-2 text-right text-[11px] font-semibold">
-                                    수량
-                                  </th>
-                                  <th className="w-[102px] px-2 py-2 text-right text-[11px] font-semibold">
-                                    금액
-                                  </th>
-                                  <th className="w-[115px] px-2 py-2 text-right text-[11px] font-semibold">
-                                    합계
-                                  </th>
-                                  <th className="px-2 py-2 text-left text-[11px] font-semibold">
-                                    비고
-                                  </th>
-                                </tr>
-                              </thead>
-
-                              <tbody>
-                                {pageItems.map((item, index) => (
-                                  <tr
-                                    key={item.id}
-                                    className={
-                                      index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                                    }
-                                  >
-                                    <td className="border-t border-gray-200 px-2 py-1.5 align-middle">
-                                      <div className="mx-auto flex h-[42px] w-[42px] items-center justify-center overflow-hidden rounded-md border border-gray-200 bg-white">
-                                        {item.image ? (
-                                          <img
-                                            src={item.image}
-                                            alt={item.name || "제품"}
-                                            className="h-full w-full object-cover"
-                                          />
-                                        ) : (
-                                          <span className="text-[8px] text-gray-400">
-                                            IMG
-                                          </span>
-                                        )}
+                                    <div>
+                                      <div className="text-[22px] font-bold tracking-tight text-gray-900">
+                                        {title}
                                       </div>
-                                    </td>
-
-                                    <td className="border-t border-gray-200 px-2 py-1.5 text-[11px] leading-4 text-gray-900">
-                                      <div className="font-semibold">
-                                        {item.name || "-"}
+                                      <div className="text-[13px] text-gray-500">
+                                        {documentNumber} · {effectiveDate}
                                       </div>
-                                    </td>
+                                    </div>
+                                  </div>
 
-                                    <td className="border-t border-gray-200 px-2 py-1.5 text-[11px] leading-4 text-gray-700">
-                                      {item.spec || "-"}
-                                    </td>
+                                  <div className="max-w-[210px] text-right text-[12px] leading-5 text-gray-500">
+                                    <div className="break-words">{notice}</div>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="border-b border-gray-300 px-7 py-3">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <div className="text-[17px] font-bold text-gray-900">
+                                      {title}
+                                    </div>
+                                    <div className="text-[12px] text-gray-500">
+                                      {effectiveDate}
+                                    </div>
+                                  </div>
 
-                                    <td className="border-t border-gray-200 px-2 py-1.5 text-center text-[11px] text-gray-700">
-                                      {item.unit || "-"}
-                                    </td>
+                                  <div className="text-[11px] text-gray-400">
+                                    Page {pageIndex + 1}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
 
-                                    <td className="border-t border-gray-200 px-2 py-1.5 text-right text-[11px] text-gray-700">
-                                      {formatNumber(item.quantity)}
-                                    </td>
+                            <div className="flex-1 px-1 py-4">
+                              <div className="overflow-hidden rounded-xl border border-gray-300">
+                                <table className="w-full table-fixed border-collapse">
+                                  <colgroup>
+                                    <col style={{ width: "96px" }} />
+                                    <col style={{ width: "155px" }} />
+                                    <col style={{ width: "78px" }} />
+                                    <col style={{ width: "46px" }} />
+                                    <col style={{ width: "50px" }} />
+                                    <col style={{ width: "82px" }} />
+                                    <col style={{ width: "92px" }} />
+                                    <col style={{ width: "125px" }} />
+                                  </colgroup>
 
-                                    <td className="border-t border-gray-200 px-2 py-1.5 text-right text-[11px] font-bold text-gray-900">
-                                      {formatNumber(item.displayPrice)}원
-                                    </td>
+                                  <thead>
+                                    <tr className="bg-white text-gray-900">
+                                      <th className="whitespace-nowrap border-b border-gray-300 px-2 py-3 text-center align-middle text-[13px] font-bold">
+                                        이미지
+                                      </th>
+                                      <th className="whitespace-nowrap border-b border-gray-300 px-2 py-3 text-center align-middle text-[13px] font-bold">
+                                        제품명
+                                      </th>
+                                      <th className="whitespace-nowrap border-b border-gray-300 px-2 py-3 text-center align-middle text-[13px] font-bold">
+                                        규격
+                                      </th>
+                                      <th className="whitespace-nowrap border-b border-gray-300 px-2 py-3 text-center align-middle text-[13px] font-bold">
+                                        단위
+                                      </th>
+                                      <th className="whitespace-nowrap border-b border-gray-300 px-2 py-3 text-center align-middle text-[13px] font-bold">
+                                        수량
+                                      </th>
+                                      <th className="whitespace-nowrap border-b border-gray-300 px-2 py-3 text-center align-middle text-[13px] font-bold">
+                                        금액
+                                      </th>
+                                      <th className="whitespace-nowrap border-b border-gray-300 px-2 py-3 text-center align-middle text-[13px] font-bold">
+                                        합계
+                                      </th>
+                                      <th className="whitespace-nowrap border-b border-gray-300 px-2 py-3 text-center align-middle text-[13px] font-bold">
+                                        비고
+                                      </th>
+                                    </tr>
+                                  </thead>
 
-                                    <td className="border-t border-gray-200 px-2 py-1.5 text-right text-[11px] font-bold text-gray-900">
-                                      {formatNumber(item.amount)}원
-                                    </td>
+                                  <tbody>
+                                    {pageItems.map((item, index) => (
+                                      <tr
+                                        key={item.id}
+                                        className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                                      >
+                                        <td className="border-t border-gray-200 px-2 py-0.5 text-center align-middle">
+                                          <div className="mx-auto flex h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-md border border-gray-200 bg-white">
+                                            {item.image ? (
+                                              <img
+                                                src={item.image}
+                                                alt={item.name || "제품"}
+                                                className="h-full w-full object-cover"
+                                              />
+                                            ) : (
+                                              <span className="text-[11px] text-gray-400">
+                                                IMG
+                                              </span>
+                                            )}
+                                          </div>
+                                        </td>
 
-                                    <td className="border-t border-gray-200 px-2 py-1.5 text-[10px] leading-4 text-gray-700">
-                                      {item.note || "-"}
-                                    </td>
-                                  </tr>
-                                ))}
+                                        <td className="border-t border-gray-200 px-2 py-0.5 text-center align-middle text-[13px] font-semibold text-gray-900">
+                                          <div className="truncate">{item.name || "-"}</div>
+                                        </td>
 
-                                {Array.from({
-                                  length: targetCount - pageItems.length,
-                                }).map((_, index) => (
-                                  <tr
-                                    key={`empty-${pageIndex}-${index}`}
-                                    className="bg-white"
-                                  >
-                                    <td className="border-t border-gray-200 px-2 py-[11px]" />
-                                    <td className="border-t border-gray-200 px-2 py-[11px]" />
-                                    <td className="border-t border-gray-200 px-2 py-[11px]" />
-                                    <td className="border-t border-gray-200 px-2 py-[11px]" />
-                                    <td className="border-t border-gray-200 px-2 py-[11px]" />
-                                    <td className="border-t border-gray-200 px-2 py-[11px]" />
-                                    <td className="border-t border-gray-200 px-2 py-[11px]" />
-                                    <td className="border-t border-gray-200 px-2 py-[11px]" />
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
+                                        <td className="border-t border-gray-200 px-2 py-0.5 text-center align-middle text-[13px] text-gray-700">
+                                          <div className="truncate">{item.spec || "-"}</div>
+                                        </td>
 
-                        <div className="border-t border-gray-200 px-7 py-3">
-                          <div className="flex items-center justify-between">
-                            <div className="text-[10px] text-gray-500">
-                              {isFirstPage
-                                ? `${company.companyName || "회사명"} · ${company.phone || "-"}`
-                                : `${company.companyName || "회사명"} · 가격표 계속`}
+                                        <td className="border-t border-gray-200 px-2 py-0.5 text-center align-middle text-[13px] text-gray-700">
+                                          {item.unit || "-"}
+                                        </td>
+
+                                        <td className="border-t border-gray-200 px-2 py-0.5 text-center align-middle text-[13px] text-gray-700">
+                                          {formatNumber(item.quantity)}
+                                        </td>
+
+                                        <td className="border-t border-gray-200 px-2 py-0.5 text-center align-middle text-[13px] font-semibold text-gray-900">
+                                          {formatNumber(item.displayPrice)}원
+                                        </td>
+
+                                        <td className="border-t border-gray-200 px-2 py-0.5 text-center align-middle text-[13px] font-semibold text-gray-900">
+                                          {formatNumber(item.amount)}원
+                                        </td>
+
+                                        <td className="border-t border-gray-200 px-2 py-0.5 text-center align-middle text-[12px] text-gray-700">
+                                          <div className="truncate">{item.note || "-"}</div>
+                                        </td>
+                                      </tr>
+                                    ))}
+
+                                    {Array.from({
+                                      length: targetCount - pageItems.length,
+                                    }).map((_, index) => (
+                                      <tr key={`empty-${pageIndex}-${index}`}>
+                                        <td className="border-t border-gray-200 px-2 py-[4px]" />
+                                        <td className="border-t border-gray-200 px-2 py-[4px]" />
+                                        <td className="border-t border-gray-200 px-2 py-[4px]" />
+                                        <td className="border-t border-gray-200 px-2 py-[4px]" />
+                                        <td className="border-t border-gray-200 px-2 py-[4px]" />
+                                        <td className="border-t border-gray-200 px-2 py-[4px]" />
+                                        <td className="border-t border-gray-200 px-2 py-[4px]" />
+                                        <td className="border-t border-gray-200 px-2 py-[4px]" />
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
                             </div>
 
-                            <div className="text-right text-[10px] text-gray-500">
-                              {pageIndex === pagedItems.length - 1 ? (
-                                <>
-                                  <div>총 수량: {formatNumber(totalQuantity)}</div>
-                                  <div className="font-semibold text-gray-900">
-                                    총 금액: {formatNumber(totalAmount)}원
-                                  </div>
-                                </>
-                              ) : (
-                                <div>
+                            <div className="border-t border-gray-300 px-7 py-2">
+                              <div className="flex items-center justify-end">
+                                <div className="text-right text-[12px] text-gray-400">
                                   {pageIndex + 1} / {pagedItems.length}
                                 </div>
-                              )}
+                              </div>
                             </div>
                           </div>
                         </div>

@@ -2,11 +2,6 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-type SavedProduct = {
-  id: number;
-  productName: string;
-};
-
 type VatMode = "included" | "separate" | "none";
 
 type EditableField =
@@ -94,7 +89,6 @@ type ClientRecord = {
 };
 
 const STORAGE_KEY = "wantb-estimates";
-const PRODUCT_KEY = "wantb-products";
 const COMPANY_KEY = "wantb-company-settings";
 const ESTIMATE_DRAFT_KEY = "estimate-draft";
 const SELECTED_CLIENT_KEY = "wantb-selected-client";
@@ -618,7 +612,6 @@ export default function EstimatePage() {
     field: EditableField;
   } | null>(null);
 
-  const [savedProducts, setSavedProducts] = useState<SavedProduct[]>([]);
   const [savedEstimates, setSavedEstimates] = useState<SavedEstimateItem[]>([]);
   const [savedClients, setSavedClients] = useState<ClientRecord[]>([]);
 
@@ -779,26 +772,6 @@ export default function EstimatePage() {
     }
   };
 
-  const refreshSavedProducts = () => {
-    if (typeof window === "undefined") return;
-
-    try {
-      const raw = localStorage.getItem(PRODUCT_KEY);
-      const parsed = raw ? JSON.parse(raw) : [];
-
-      if (Array.isArray(parsed)) {
-        const normalized: SavedProduct[] = parsed.map((item: any, index: number) => ({
-          id: Number(item?.id ?? Date.now() + index),
-          productName: String(item?.productName ?? ""),
-        }));
-        setSavedProducts(normalized);
-      } else {
-        setSavedProducts([]);
-      }
-    } catch {
-      setSavedProducts([]);
-    }
-  };
 
   const refreshSavedClients = () => {
     if (typeof window === "undefined") return;
@@ -1001,7 +974,6 @@ export default function EstimatePage() {
       setEstimateNumber(String(nextNumber));
     }
 
-    refreshSavedProducts();
     refreshSavedEstimates();
     refreshSavedClients();
   }, []);
@@ -1106,35 +1078,6 @@ export default function EstimatePage() {
     setEmail("");
   }, []);
 
-  const handleProductSelect = (selectedProductName: string) => {
-    setItems((prev) => {
-      const updated = [...prev];
-      if (updated.length === 0) {
-        return [
-          sanitizeLineItem(
-            {
-              productName: selectedProductName,
-              spec: "",
-              unit: "EA",
-              quantity: 1,
-              unitPrice: 0,
-            },
-            vatMode
-          ),
-        ];
-      }
-
-      updated[0] = sanitizeLineItem(
-        {
-          ...updated[0],
-          productName: selectedProductName,
-        },
-        vatMode
-      );
-
-      return updated;
-    });
-  };
 
   const handleAddItem = () => {
     setItems((prev) => [...prev, createEmptyLineItem()]);
@@ -1971,7 +1914,7 @@ const resetItemsOnly = () => {
           <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-5 shadow-sm">
             <h2 className="mb-3 text-[16px] font-semibold text-gray-900">기본 정보</h2>
 
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3">
               <label className="block">
                 <span className="mb-1.5 block text-[12px] font-medium text-gray-700">
                   견적번호
@@ -1984,23 +1927,6 @@ const resetItemsOnly = () => {
                 />
               </label>
 
-              <label className="block">
-                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">
-                  저장된 제품 불러오기
-                </span>
-                <select
-                  value={items[0]?.productName || ""}
-                  onChange={(e) => handleProductSelect(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
-                >
-                  <option value="">제품 선택</option>
-                  {savedProducts.map((item) => (
-                    <option key={item.id} value={item.productName}>
-                      {item.productName}
-                    </option>
-                  ))}
-                </select>
-              </label>
             </div>
           </div>
 

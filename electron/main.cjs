@@ -5,6 +5,7 @@ const os = require("os");
 const crypto = require("crypto");
 const http = require("http");
 const next = require("next");
+const { execFile } = require("child_process");
 const { getEmbeddedLicenseCodes } = require("./licenseStore.cjs");
 
 const isDev = !app.isPackaged;
@@ -212,6 +213,287 @@ function isInternalWindowUrl(url) {
   }
 }
 
+function sanitizeFileName(fileName, fallback = "output") {
+  const safe = String(fileName || fallback)
+    .replace(/[\\/:*?"<>|]/g, "_")
+    .trim();
+
+  return safe || fallback;
+}
+
+function resolveDefaultPath(options = {}) {
+  const downloadsPath = app.getPath("downloads");
+  const defaultFileName = sanitizeFileName(
+    options.defaultPath || options.defaultFileName || options.fileName || "output"
+  );
+
+  if (path.isAbsolute(defaultFileName)) {
+    return defaultFileName;
+  }
+
+  return path.join(downloadsPath, defaultFileName);
+}
+
+async function showSaveDialogInternal(options = {}) {
+  const browserWindow = BrowserWindow.getFocusedWindow() || mainWindow || null;
+
+  const result = await dialog.showSaveDialog(browserWindow, {
+    title: options.title || "저장 위치 선택",
+    defaultPath: resolveDefaultPath(options),
+    filters: Array.isArray(options.filters) ? options.filters : undefined,
+    properties: ["showOverwriteConfirmation"],
+  });
+
+  return result;
+}
+
+function toBufferFromPayload(payload = {}) {
+  try {
+    if (Buffer.isBuffer(payload.buffer)) {
+      return payload.buffer;
+    }
+
+    if (payload.byteArray && Array.isArray(payload.byteArray)) {
+      return Buffer.from(payload.byteArray);
+    }
+
+    if (payload.bytes && Array.isArray(payload.bytes)) {
+      return Buffer.from(payload.bytes);
+    }
+
+    if (typeof payload.base64 === "string" && payload.base64.trim()) {
+      return Buffer.from(payload.base64, "base64");
+    }
+
+    if (typeof payload.dataUrl === "string" && payload.dataUrl.startsWith("data:")) {
+      const base64 = payload.dataUrl.split(",")[1] || "";
+      return Buffer.from(base64, "base64");
+    }
+
+    if (typeof payload.text === "string") {
+      return Buffer.from(payload.text, "utf-8");
+    }
+
+    return null;
+  } catch (error) {
+    writeDebugLog("Buffer 변환 실패", error?.message || error);
+    return null;
+  }
+}
+
+async function saveBinaryFileInternal(payload = {}) {
+  const saveDialogResult = await showSaveDialogInternal({
+    title: payload.title || "파일 저장",
+    defaultPath:
+      payload.defaultPath || payload.defaultFileName || payload.fileName || "output",
+    filters: payload.filters,
+  });
+
+  if (saveDialogResult.canceled || !saveDialogResult.filePath) {
+    return {
+      success: false,
+      canceled: true,
+      filePath: "",
+      message: "사용자가 저장을 취소했습니다.",
+    };
+  }
+
+  const buffer = toBufferFromPayload(payload);
+
+  if (!buffer) {
+    return {
+      success: false,
+      canceled: false,
+      filePath: saveDialogResult.filePath,
+      message: "저장할 데이터가 없습니다.",
+    };
+  }
+
+  fs.writeFileSync(saveDialogResult.filePath, buffer);
+
+  return {
+    success: true,
+    canceled: false,
+    filePath: saveDialogResult.filePath,
+    message: "파일 저장 완료",
+  };
+}
+
+async function savePdfInternal(html, defaultFileName) {
+  const saveDialogResult = await showSaveDialogInternal({
+    title: "PDF 저장",
+    defaultPath: defaultFileName || "document.pdf",
+    filters: [{ name: "PDF Files", extensions: ["pdf"] }],
+  });
+
+  if (saveDialogResult.canceled || !saveDialogResult.filePath) {
+    return {
+      success: false,
+      canceled: true,
+      filePath: "",
+      message: "사용자가 저장을 취소했습니다.",
+    };
+  }
+
+  const pdfWindow = new BrowserWindow({
+    show: false,
+    width: 1200,
+    height: 1600,
+    autoHideMenuBar: true,
+    webPreferences: {
+      sandbox: false,
+    },
+  });
+
+  try {
+    await pdfWindow.loadURL(
+      `data:text/html;charset=utf-8,${encodeURIComponent(html || "")}`
+    );
+
+    const pdfBuffer = await pdfWindow.webContents.printToPDF({
+      printBackground: true,
+      preferCSSPageSize: true,
+      pageSize: "A4",
+      margins: {
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+      },
+    });
+
+    fs.writeFileSync(saveDialogResult.filePath, pdfBuffer);
+
+    return {
+      success: true,
+      canceled: false,
+      filePath: saveDialogResult.filePath,
+      message: "PDF 저장 완료",
+    };
+  } catch (error) {
+    writeDebugLog("PDF 저장 실패", error?.message || error);
+    return {
+      success: false,
+      canceled: false,
+      filePath: saveDialogResult.filePath || "",
+      message: "PDF 저장 중 오류가 발생했습니다.",
+    };
+  } finally {
+    if (!pdfWindow.isDestroyed()) {
+      pdfWindow.close();
+    }
+  }
+}
+
+function normalizeExternalUrl(url) {
+  const raw = String(url || "").trim();
+  if (!raw) return "";
+
+  if (/^https?:\/\//i.test(raw)) {
+    return raw;
+  }
+
+  return `https://${raw}`;
+}
+
+async function openExternalUrlInternal(url) {
+  try {
+    const targetUrl = normalizeExternalUrl(url);
+
+    writeDebugLog("openExternalUrlInternal called", {
+      input: url,
+      normalized: targetUrl,
+    });
+
+    if (!targetUrl) {
+      writeDebugLog("openExternalUrlInternal invalid url");
+      return {
+        success: false,
+        message: "열 URL이 없습니다.",
+      };
+    }
+
+    await shell.openExternal(targetUrl);
+
+    writeDebugLog("openExternalUrlInternal success", targetUrl);
+
+    return {
+      success: true,
+      message: "외부 브라우저 실행 완료",
+      url: targetUrl,
+    };
+  } catch (error) {
+    writeDebugLog("외부 브라우저 실행 실패", error?.message || error);
+    return {
+      success: false,
+      message: error?.message || "외부 브라우저 실행 중 오류가 발생했습니다.",
+    };
+  }
+}
+
+function getChromeCandidates() {
+  return [
+    path.join(process.env["PROGRAMFILES"] || "C:\\Program Files", "Google", "Chrome", "Application", "chrome.exe"),
+    path.join(process.env["PROGRAMFILES(X86)"] || "C:\\Program Files (x86)", "Google", "Chrome", "Application", "chrome.exe"),
+    path.join(process.env["LOCALAPPDATA"] || "", "Google", "Chrome", "Application", "chrome.exe"),
+  ].filter(Boolean);
+}
+
+function findChromePath() {
+  const candidates = getChromeCandidates();
+
+  for (const candidate of candidates) {
+    try {
+      if (candidate && fs.existsSync(candidate)) {
+        return candidate;
+      }
+    } catch {}
+  }
+
+  return "";
+}
+
+async function openHometaxWithChrome() {
+  const targetUrl = "https://www.hometax.go.kr/";
+  const chromePath = findChromePath();
+
+  writeDebugLog("openHometaxWithChrome start", {
+    chromePath,
+    targetUrl,
+  });
+
+  if (!chromePath) {
+    writeDebugLog("chrome executable not found, fallback to shell.openExternal");
+    return await openExternalUrlInternal(targetUrl);
+  }
+
+  return await new Promise((resolve) => {
+    const args = ["--new-window", "--incognito", targetUrl];
+
+    execFile(chromePath, args, (error) => {
+      if (error) {
+        writeDebugLog("openHometaxWithChrome failed", error?.message || error);
+        resolve({
+          success: false,
+          message: error?.message || "홈택스 실행 중 오류가 발생했습니다.",
+        });
+        return;
+      }
+
+      writeDebugLog("openHometaxWithChrome success", {
+        chromePath,
+        args,
+      });
+
+      resolve({
+        success: true,
+        message: "홈택스 실행 완료",
+        url: targetUrl,
+      });
+    });
+  });
+}
+
 async function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -266,6 +548,7 @@ async function createMainWindow() {
 
 app.whenReady().then(async () => {
   ensureUserDataDir();
+  writeDebugLog("앱 시작", { isDev, userData: getUserDataDir() });
 
   ipcMain.handle("getHardwareId", async () => {
     try {
@@ -344,6 +627,60 @@ app.whenReady().then(async () => {
     } catch {
       return { success: false };
     }
+  });
+
+  ipcMain.handle("show-save-dialog", async (_, options) => {
+    try {
+      const result = await showSaveDialogInternal(options || {});
+      return {
+        canceled: !!result.canceled,
+        filePath: result.filePath || "",
+      };
+    } catch (error) {
+      writeDebugLog("show-save-dialog 실패", error?.message || error);
+      return {
+        canceled: true,
+        filePath: "",
+      };
+    }
+  });
+
+  ipcMain.handle("save-binary-file", async (_, payload) => {
+    try {
+      return await saveBinaryFileInternal(payload || {});
+    } catch (error) {
+      writeDebugLog("save-binary-file 실패", error?.message || error);
+      return {
+        success: false,
+        canceled: false,
+        filePath: "",
+        message: "파일 저장 중 오류가 발생했습니다.",
+      };
+    }
+  });
+
+  ipcMain.handle("save-pdf", async (_, { html, defaultFileName } = {}) => {
+    try {
+      return await savePdfInternal(html || "", defaultFileName || "document.pdf");
+    } catch (error) {
+      writeDebugLog("save-pdf 실패", error?.message || error);
+      return {
+        success: false,
+        canceled: false,
+        filePath: "",
+        message: "PDF 저장 중 오류가 발생했습니다.",
+      };
+    }
+  });
+
+  ipcMain.handle("open-external-url", async (_, url) => {
+    writeDebugLog("ipcMain open-external-url received", url);
+    return await openExternalUrlInternal(url);
+  });
+
+  ipcMain.handle("open-hometax-direct", async () => {
+    writeDebugLog("ipcMain open-hometax-direct received");
+    return await openHometaxWithChrome();
   });
 
   try {

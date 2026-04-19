@@ -15,26 +15,25 @@ const menuItems = [
   { label: "Price List", sub: "유통 단가표", href: "/pricelist" },
   { label: "Clients", sub: "거래처관리", href: "/clients" },
   { label: "Company Settings", sub: "회사설정", href: "/company-settings" },
-  { label: "Templates", sub: "템플릿", href: "/templates" },
   { label: "About", sub: "프로그램정보", href: "/about" },
 ];
 
 const quickLinks = [
   {
     label: "홈택스 바로가기",
-    href: "https://www.hometax.go.kr",
+    href: "https://www.hometax.go.kr/",
   },
   {
     label: "네이버 바로가기",
-    href: "https://www.naver.com",
+    href: "https://www.naver.com/",
   },
   {
     label: "구글 바로가기",
-    href: "https://www.google.com",
+    href: "https://www.google.com/",
   },
   {
     label: "다음 바로가기",
-    href: "https://www.daum.net",
+    href: "https://www.daum.net/",
   },
 ];
 
@@ -76,6 +75,59 @@ export default function LayoutClient({ children }: LayoutClientProps) {
 
   const currentAd = adItems[currentAdIndex];
 
+  const handleQuickLinkClick = async (
+    e: React.MouseEvent<HTMLButtonElement>,
+    href: string,
+    label: string
+  ) => {
+    e.preventDefault();
+
+    try {
+      const electronWindow = window as Window & {
+        electronAPI?: {
+          openExternalUrl?: (url: string) => Promise<{
+            success: boolean;
+            message?: string;
+            url?: string;
+          }>;
+          openHometaxDirect?: () => Promise<{
+            success: boolean;
+            message?: string;
+            url?: string;
+          }>;
+        };
+      };
+
+      if (label === "홈택스 바로가기" && electronWindow.electronAPI?.openHometaxDirect) {
+        const result = await electronWindow.electronAPI.openHometaxDirect();
+
+        if (!result?.success) {
+          alert(`실패: ${result?.message || "홈택스 실행 실패"}`);
+        }
+
+        return;
+      }
+
+      if (
+        electronWindow.electronAPI &&
+        typeof electronWindow.electronAPI.openExternalUrl === "function"
+      ) {
+        const result = await electronWindow.electronAPI.openExternalUrl(href);
+
+        if (!result?.success) {
+          alert(`실패: ${result?.message || "외부 브라우저 실행 실패"}`);
+        }
+
+        return;
+      }
+
+      window.open(href, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      console.error("외부 링크 실행 실패:", error);
+      alert("외부 브라우저 실행 중 오류가 발생했습니다.");
+    }
+  };
+
   return (
     <div className="flex min-h-screen bg-gray-100">
       <aside className="no-drag h-screen w-[260px] overflow-y-auto border-r border-gray-200 bg-white px-5 py-6">
@@ -113,7 +165,7 @@ export default function LayoutClient({ children }: LayoutClientProps) {
 
         <div className="mt-5">
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-            <div className="relative h-[170px] w-full bg-gray-900">
+            <div className="relative h-[425px] w-full bg-gray-900">
               <img
                 src={currentAd.imageUrl}
                 alt={currentAd.title}
@@ -161,15 +213,14 @@ export default function LayoutClient({ children }: LayoutClientProps) {
 
           <div className="mt-3 grid grid-cols-1 gap-2">
             {quickLinks.map((link) => (
-              <a
+              <button
                 key={link.label}
-                href={link.href}
-                target="_blank"
-                rel="noreferrer"
+                type="button"
+                onClick={(e) => handleQuickLinkClick(e, link.href, link.label)}
                 className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-center text-xs font-semibold text-gray-700 transition hover:bg-gray-100"
               >
                 {link.label}
-              </a>
+              </button>
             ))}
           </div>
         </div>

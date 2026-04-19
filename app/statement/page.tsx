@@ -3259,7 +3259,7 @@ const handlePrint = useCallback(async () => {
           </div>
         </div>
 
-        <div className="rounded-[26px] border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="self-start rounded-[26px] border border-gray-200 bg-white p-4 shadow-sm xl:sticky xl:top-5">
           <div className="mb-3 flex items-center justify-between">
             <div>
               <h2 className="text-[16px] font-semibold text-gray-900">A4 미리보기</h2>
