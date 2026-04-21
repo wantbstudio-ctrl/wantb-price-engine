@@ -19,22 +19,10 @@ const menuItems = [
 ];
 
 const quickLinks = [
-  {
-    label: "홈택스 바로가기",
-    href: "https://www.hometax.go.kr/",
-  },
-  {
-    label: "네이버 바로가기",
-    href: "https://www.naver.com/",
-  },
-  {
-    label: "구글 바로가기",
-    href: "https://www.google.com/",
-  },
-  {
-    label: "다음 바로가기",
-    href: "https://www.daum.net/",
-  },
+  { label: "홈택스 바로가기", href: "https://www.hometax.go.kr/" },
+  { label: "네이버 바로가기", href: "https://www.naver.com/" },
+  { label: "구글 바로가기", href: "https://www.google.com/" },
+  { label: "다음 바로가기", href: "https://www.daum.net/" },
 ];
 
 const defaultAds = [
@@ -42,19 +30,19 @@ const defaultAds = [
     id: 1,
     title: "광고 배너 영역",
     description: "관리자 이미지 · 시간 설정 연결 예정",
-    imageUrl: "https://dummyimage.com/800x420/e5e7eb/111827&text=AD+01",
+    imageUrl: "https://dummyimage.com/800x420/1f2024/f5f7fb&text=AD+01",
   },
   {
     id: 2,
-    title: "원프앤 공지 슬롯",
-    description: "이벤트 · 공지 · 업데이트 배너 배포 가능",
-    imageUrl: "https://dummyimage.com/800x420/dbeafe/111827&text=AD+02",
+    title: "원트비 공지 슬롯",
+    description: "향후 관리자 설정과 연결할 광고 영역",
+    imageUrl: "https://dummyimage.com/800x420/23252a/f5f7fb&text=AD+02",
   },
   {
     id: 3,
     title: "관리자 배너 영역",
-    description: "향후 관리자 설정과 연결할 광고 영역",
-    imageUrl: "https://dummyimage.com/800x420/f3e8ff/111827&text=AD+03",
+    description: "이벤트 · 공지 · 업데이트 배너 배포 가능",
+    imageUrl: "https://dummyimage.com/800x420/1b1d22/f5f7fb&text=AD+03",
   },
 ];
 
@@ -98,7 +86,10 @@ export default function LayoutClient({ children }: LayoutClientProps) {
         };
       };
 
-      if (label === "홈택스 바로가기" && electronWindow.electronAPI?.openHometaxDirect) {
+      if (
+        label === "홈택스 바로가기" &&
+        electronWindow.electronAPI?.openHometaxDirect
+      ) {
         const result = await electronWindow.electronAPI.openHometaxDirect();
 
         if (!result?.success) {
@@ -129,11 +120,15 @@ export default function LayoutClient({ children }: LayoutClientProps) {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
-      <aside className="no-drag h-screen w-[260px] overflow-y-auto border-r border-gray-200 bg-white px-5 py-6">
+    <div className="flex min-h-screen bg-[#0a0a0b] text-[#f5f7fb]">
+      <aside className="no-drag h-screen w-[260px] overflow-y-auto border-r border-[#454850] bg-[#161618] px-5 py-6">
         <div className="mb-10">
-          <h1 className="text-xl font-bold text-gray-900">원트비 프라이스 엔진</h1>
-          <p className="mt-1 text-xs text-gray-400">WantB Price Engine</p>
+          <h1 className="text-[18px] font-bold leading-tight tracking-[-0.02em] text-white whitespace-nowrap">
+            원트비 프라이스 엔진
+          </h1>
+          <p className="mt-2 text-sm font-medium tracking-wide text-[#b3b0ab]">
+            WantB Price Engine
+          </p>
         </div>
 
         <nav className="flex flex-col gap-2">
@@ -144,16 +139,23 @@ export default function LayoutClient({ children }: LayoutClientProps) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col rounded-xl px-4 py-3 transition ${
+                className={`group relative flex flex-col rounded-2xl border px-4 py-3.5 transition-all duration-200 ${
                   isActive
-                    ? "bg-gray-900 text-white"
-                    : "text-gray-700 hover:bg-gray-100"
+                    ? "border-[#0ea5ff] bg-[#23252a] text-white shadow-[0_0_0_1px_rgba(14,165,255,0.16),0_0_18px_rgba(14,165,255,0.08)]"
+                    : "border-transparent text-[#d7d2cc] hover:border-[#454850] hover:bg-[#23252a] hover:text-white"
                 }`}
               >
-                <span className="text-sm font-semibold">{item.label}</span>
                 <span
-                  className={`text-xs ${
-                    isActive ? "text-gray-300" : "text-gray-400"
+                  className={`absolute left-0 top-3 bottom-3 w-[4px] rounded-r-full transition-all ${
+                    isActive
+                      ? "bg-[#0ea5ff] shadow-[0_0_14px_rgba(14,165,255,0.8)]"
+                      : "bg-transparent group-hover:bg-[#67e8f9]/70"
+                  }`}
+                />
+                <span className="pl-3 text-sm font-semibold">{item.label}</span>
+                <span
+                  className={`pl-3 text-xs ${
+                    isActive ? "text-[#67e8f9]" : "text-[#b3b0ab]"
                   }`}
                 >
                   {item.sub}
@@ -163,47 +165,48 @@ export default function LayoutClient({ children }: LayoutClientProps) {
           })}
         </nav>
 
-        <div className="mt-5">
-          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-            <div className="relative h-[425px] w-full bg-gray-900">
+        <div className="mt-5 space-y-3">
+          <div className="overflow-hidden rounded-3xl border border-[#454850] bg-[#23252a] shadow-[0_12px_30px_rgba(0,0,0,0.35)]">
+            <div className="relative h-[425px] w-full bg-[#18191c]">
               <img
                 src={currentAd.imageUrl}
                 alt={currentAd.title}
-                className="absolute inset-0 h-full w-full object-cover"
+                className="absolute inset-0 h-full w-full object-cover opacity-70"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/35 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0b0b0d] via-[#0b0b0d]/45 to-transparent" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(14,165,255,0.22),transparent_38%)]" />
 
               <div className="relative z-10 flex h-full flex-col justify-between p-4 text-white">
                 <div>
-                  <p className="text-[11px] font-semibold tracking-[0.18em] text-white/80">
+                  <p className="text-[11px] font-semibold tracking-[0.18em] text-[#0ea5ff]">
                     ADVERTISEMENT
                   </p>
-                  <h3 className="mt-2 text-sm font-bold leading-snug">
+                  <h3 className="mt-3 text-lg font-bold leading-snug text-white">
                     {currentAd.title}
                   </h3>
-                  <p className="mt-2 text-[11px] leading-relaxed text-white/85">
+                  <p className="mt-2 text-[12px] leading-relaxed text-[#d7d2cc]">
                     {currentAd.description}
                   </p>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <div className="flex gap-1.5">
+                  <div className="flex gap-2">
                     {adItems.map((item, index) => (
                       <button
                         key={item.id}
                         type="button"
                         onClick={() => setCurrentAdIndex(index)}
-                        className={`h-2 w-2 rounded-full transition ${
+                        className={`h-3 w-3 rounded-full border transition ${
                           currentAdIndex === index
-                            ? "bg-white"
-                            : "bg-white/35 hover:bg-white/60"
+                            ? "border-[#0ea5ff] bg-[#0ea5ff] shadow-[0_0_12px_rgba(14,165,255,0.9)]"
+                            : "border-[#6d6a65] bg-white/20 hover:border-[#67e8f9] hover:bg-[#67e8f9]/70"
                         }`}
                         aria-label={`광고 ${index + 1} 보기`}
                       />
                     ))}
                   </div>
 
-                  <span className="text-[10px] font-medium text-white/80">
+                  <span className="text-xs font-medium text-[#f5f7fb]">
                     {currentAdIndex + 1} / {adItems.length}
                   </span>
                 </div>
@@ -211,22 +214,28 @@ export default function LayoutClient({ children }: LayoutClientProps) {
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-1 gap-2">
-            {quickLinks.map((link) => (
-              <button
-                key={link.label}
-                type="button"
-                onClick={(e) => handleQuickLinkClick(e, link.href, link.label)}
-                className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-center text-xs font-semibold text-gray-700 transition hover:bg-gray-100"
-              >
-                {link.label}
-              </button>
-            ))}
+          <div className="rounded-3xl border border-[#454850] bg-[#23252a] p-3 shadow-[0_10px_24px_rgba(0,0,0,0.24)]">
+            <p className="mb-3 px-1 text-[11px] font-semibold tracking-[0.16em] text-[#b3b0ab]">
+              QUICK LINKS
+            </p>
+
+            <div className="grid grid-cols-1 gap-2">
+              {quickLinks.map((link) => (
+                <button
+                  key={link.label}
+                  type="button"
+                  onClick={(e) => handleQuickLinkClick(e, link.href, link.label)}
+                  className="rounded-2xl border border-[#454850] bg-[#1b1d22] px-4 py-3 text-left text-sm font-semibold text-[#e2ddd7] transition-all duration-200 hover:border-[#0ea5ff] hover:bg-[#25282f] hover:text-white hover:shadow-[0_0_16px_rgba(14,165,255,0.10)]"
+                >
+                  {link.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </aside>
 
-      <main className="flex-1 p-6">{children}</main>
+      <main className="flex-1 bg-[#0a0a0b] p-6">{children}</main>
     </div>
   );
 }

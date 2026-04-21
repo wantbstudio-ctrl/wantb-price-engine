@@ -414,6 +414,30 @@ type EstimateRowProps = {
   ) => void;
 };
 
+const fieldInputClass =
+  "h-[44px] w-full rounded-2xl border border-[#3b4552] bg-[#0b1016] px-4 text-[14px] text-[#f3f7fb] outline-none placeholder:text-[#6f7b88] transition focus:border-[#22b7ff] focus:bg-[#0d131a] focus:shadow-[0_0_0_3px_rgba(34,183,255,0.10)]";
+
+const sectionTitleClass =
+  "text-[18px] font-bold tracking-[-0.02em] text-[#f7f8fb]";
+
+const sectionDescriptionClass =
+  "mt-2 text-[13px] leading-6 text-[#a6b0b9]";
+
+const primaryButtonClass =
+  "inline-flex h-[42px] items-center justify-center rounded-2xl border border-[#22b7ff] bg-[#1aa7f7] px-4 text-[13px] font-semibold text-white transition hover:bg-[#2eb5ff] hover:shadow-[0_0_18px_rgba(34,183,255,0.18)]";
+
+const outlineBlueButtonClass =
+  "inline-flex h-[42px] items-center justify-center rounded-2xl border border-[#2b82b6] bg-[#0d1319] px-4 text-[13px] font-semibold text-[#6fd6ff] transition hover:border-[#22b7ff] hover:bg-[#111b24] hover:text-white";
+
+const mutedBlueButtonClass =
+  "inline-flex h-[42px] items-center justify-center rounded-2xl border border-[#37424d] bg-[#11161d] px-4 text-[13px] font-semibold text-[#dce6ef] transition hover:border-[#22b7ff] hover:bg-[#131b24] hover:text-white";
+
+const miniBlueChipClass =
+  "inline-flex h-8 items-center justify-center rounded-full border border-[#2b82b6] bg-[#0d1319] px-3 text-[10px] font-semibold tracking-[0.12em] text-[#6fd6ff] transition hover:border-[#22b7ff] hover:text-white";
+
+const cardClass =
+  "rounded-[30px] border border-[#3a424b] bg-[#1b2026] px-5 py-5 shadow-[0_18px_34px_rgba(0,0,0,0.28)] ring-1 ring-[rgba(255,255,255,0.02)]";
+
 const EstimateRow = memo(function EstimateRow({
   item,
   index,
@@ -467,57 +491,57 @@ const EstimateRow = memo(function EstimateRow({
 
   return (
     <div
-      className={`grid grid-cols-[60px_minmax(260px,2.2fr)_minmax(160px,1.2fr)_90px_90px_140px_150px_110px_150px] items-center min-h-[56px] border-b border-gray-200 text-[13px] ${
-        isSelected ? "bg-gray-100" : "bg-white"
+      className={`grid grid-cols-[60px_minmax(260px,2.2fr)_minmax(160px,1.2fr)_90px_90px_140px_150px_110px_150px] items-center min-h-[58px] border-b border-[#27303a] text-[13px] ${
+        isSelected ? "bg-[#121c26]" : "bg-[#10151b]"
       }`}
     >
-      <div className="border-r border-gray-200 p-2">
+      <div className="border-r border-[#27303a] p-2">
         <button
           type="button"
           onClick={() => onToggleSelect(item.id)}
-          className={`flex h-10 w-full items-center justify-center rounded-xl border text-[12px] font-semibold ${
+          className={`flex h-10 w-full items-center justify-center rounded-xl border text-[12px] font-semibold transition ${
             isSelected
-              ? "border-gray-900 bg-gray-900 text-white"
-              : "border-gray-300 bg-white text-gray-700"
+              ? "border-[#22b7ff] bg-[#0f2430] text-[#74ddff]"
+              : "border-[#34404b] bg-[#0c1117] text-[#d6e2ec]"
           }`}
         >
           선택
         </button>
       </div>
 
-      <div className="border-r border-gray-200 p-2 pt-[10px]">
+      <div className="border-r border-[#27303a] p-2 pt-[10px]">
         <input
           ref={(el) => registerInput(item.id, "productName", el)}
           value={item.productName}
           onChange={(e) => onChange(item.id, "productName", e.target.value)}
           onKeyDown={(e) => handleKeyDown(e, "productName")}
           placeholder={`품목 ${index + 1}`}
-          className="h-[42px] w-full rounded-xl border border-gray-300 bg-white px-3 leading-[42px] outline-none focus:border-gray-900"
+          className="h-[42px] w-full rounded-xl border border-[#34404b] bg-[#0c1117] px-3 text-[#f4f8fb] outline-none placeholder:text-[#6f7b88] transition focus:border-[#22b7ff]"
         />
       </div>
 
-      <div className="border-r border-gray-200 p-2 pt-[10px]">
+      <div className="border-r border-[#27303a] p-2 pt-[10px]">
         <input
           ref={(el) => registerInput(item.id, "spec", el)}
           value={item.spec}
           onChange={(e) => onChange(item.id, "spec", e.target.value)}
           onKeyDown={(e) => handleKeyDown(e, "spec")}
           placeholder="규격"
-          className="h-[42px] w-full rounded-xl border border-gray-300 bg-white px-3 leading-[42px] outline-none focus:border-gray-900"
+          className="h-[42px] w-full rounded-xl border border-[#34404b] bg-[#0c1117] px-3 text-[#f4f8fb] outline-none placeholder:text-[#6f7b88] transition focus:border-[#22b7ff]"
         />
       </div>
 
-      <div className="border-r border-gray-200 p-2 pt-[10px]">
+      <div className="border-r border-[#27303a] p-2 pt-[10px]">
         <input
           ref={(el) => registerInput(item.id, "unit", el)}
           value={item.unit}
           onChange={(e) => onChange(item.id, "unit", e.target.value)}
           onKeyDown={(e) => handleKeyDown(e, "unit")}
-          className="h-[42px] w-full rounded-xl border border-gray-300 bg-white px-2 text-center leading-[42px] outline-none focus:border-gray-900"
+          className="h-[42px] w-full rounded-xl border border-[#34404b] bg-[#0c1117] px-2 text-center text-[#f4f8fb] outline-none placeholder:text-[#6f7b88] transition focus:border-[#22b7ff]"
         />
       </div>
 
-      <div className="border-r border-gray-200 p-2 pt-[10px]">
+      <div className="border-r border-[#27303a] p-2 pt-[10px]">
         <input
           ref={(el) => registerInput(item.id, "quantity", el)}
           type="number"
@@ -534,11 +558,11 @@ const EstimateRow = memo(function EstimateRow({
             onChange(item.id, "quantity", Number(e.target.value || 1))
           }
           onKeyDown={(e) => handleKeyDown(e, "quantity")}
-          className="h-[42px] w-full rounded-xl border border-gray-300 bg-white px-3 text-right leading-[42px] outline-none focus:border-gray-900"
+          className="h-[42px] w-full rounded-xl border border-[#34404b] bg-[#0c1117] px-3 text-right text-[#f4f8fb] outline-none placeholder:text-[#6f7b88] transition focus:border-[#22b7ff]"
         />
       </div>
 
-      <div className="border-r border-gray-200 p-2 pt-[10px]">
+      <div className="border-r border-[#27303a] p-2 pt-[10px]">
         <input
           ref={(el) => registerInput(item.id, "unitPrice", el)}
           type="number"
@@ -555,11 +579,11 @@ const EstimateRow = memo(function EstimateRow({
             onChange(item.id, "unitPrice", Number(e.target.value || 0))
           }
           onKeyDown={(e) => handleKeyDown(e, "unitPrice")}
-          className="h-[42px] w-full rounded-xl border border-gray-300 bg-white px-3 text-right leading-[42px] outline-none focus:border-gray-900"
+          className="h-[42px] w-full rounded-xl border border-[#34404b] bg-[#0c1117] px-3 text-right text-[#f4f8fb] outline-none placeholder:text-[#6f7b88] transition focus:border-[#22b7ff]"
         />
       </div>
 
-      <div className="border-r border-gray-200 p-2 pt-[10px]">
+      <div className="border-r border-[#27303a] p-2 pt-[10px]">
         <input
           ref={(el) => registerInput(item.id, "supplyAmount", el)}
           type="number"
@@ -576,26 +600,28 @@ const EstimateRow = memo(function EstimateRow({
             onChange(item.id, "supplyAmount", Number(e.target.value || 0))
           }
           onKeyDown={(e) => handleKeyDown(e, "supplyAmount")}
-          className="h-[42px] w-full rounded-xl border border-gray-300 bg-white px-3 text-right leading-[42px] outline-none focus:border-gray-900"
+          className="h-[42px] w-full rounded-xl border border-[#34404b] bg-[#0c1117] px-3 text-right text-[#f4f8fb] outline-none placeholder:text-[#6f7b88] transition focus:border-[#22b7ff]"
         />
       </div>
 
-      <div className="border-r border-gray-200 p-2 pt-[10px]">
-        <div className="flex h-[42px] items-center justify-end rounded-xl border border-gray-200 bg-gray-100 px-3 text-[13px] text-gray-700">
+      <div className="border-r border-[#27303a] p-2 pt-[10px]">
+        <div className="flex h-[42px] items-center justify-end rounded-xl border border-[#2c3640] bg-[#0a0f15] px-3 text-[13px] text-[#d7e1ea]">
           {formatNumber(item.vat)}
         </div>
       </div>
 
       <div className="flex items-center justify-center gap-2 p-2 pt-[10px]">
         <button
+          type="button"
           onClick={() => onDuplicate(item.id)}
-          className="rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-[12px] font-semibold text-gray-700"
+          className="rounded-xl border border-[#2b82b6] bg-[#0d1319] px-3 py-2 text-[12px] font-semibold text-[#6fd6ff] transition hover:border-[#22b7ff] hover:text-white"
         >
           복제
         </button>
         <button
+          type="button"
           onClick={() => onRemove(item.id)}
-          className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-600"
+          className="rounded-xl border border-[#2b82b6] bg-[#0d1319] px-3 py-2 text-[12px] font-semibold text-[#6fd6ff] transition hover:border-[#22b7ff] hover:text-white"
         >
           삭제
         </button>
@@ -675,6 +701,9 @@ export default function EstimatePage() {
 
   const resolvedStamp =
     companySettings.stamp || companySettings.stampDataUrl || null;
+
+  const resolvedLogo =
+    companySettings.logo || companySettings.logoDataUrl || null;
 
   const resolvedCeo =
     companySettings.ceo ||
@@ -766,12 +795,13 @@ export default function EstimatePage() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       const parsed: SavedEstimateItem[] = raw ? JSON.parse(raw) : [];
-      setSavedEstimates(Array.isArray(parsed) ? parsed.sort((a, b) => b.id - a.id) : []);
+      setSavedEstimates(
+        Array.isArray(parsed) ? parsed.sort((a, b) => b.id - a.id) : []
+      );
     } catch {
       setSavedEstimates([]);
     }
   };
-
 
   const refreshSavedClients = () => {
     if (typeof window === "undefined") return;
@@ -1078,7 +1108,6 @@ export default function EstimatePage() {
     setEmail("");
   }, []);
 
-
   const handleAddItem = () => {
     setItems((prev) => [...prev, createEmptyLineItem()]);
   };
@@ -1167,19 +1196,19 @@ export default function EstimatePage() {
     setSelectedRowIds([]);
   };
 
+  const resetItemsOnly = () => {
+    const ok = window.confirm("품목 정보만 초기화하시겠습니까?");
+    if (!ok) return;
 
-const resetItemsOnly = () => {
-  const ok = window.confirm("품목 정보만 초기화하시겠습니까?");
-  if (!ok) return;
+    setItems([
+      createEmptyLineItem(),
+      createEmptyLineItem(),
+      createEmptyLineItem(),
+    ]);
 
-  setItems([
-    createEmptyLineItem(),
-    createEmptyLineItem(),
-    createEmptyLineItem(),
-  ]);
+    setSelectedRowIds([]);
+  };
 
-  setSelectedRowIds([]);
-};
   useEffect(() => {
     setSelectedRowIds((prev) =>
       prev.filter((id) => items.some((item) => item.id === id))
@@ -1318,7 +1347,9 @@ const resetItemsOnly = () => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       const parsed: SavedEstimateItem[] = raw ? JSON.parse(raw) : [];
-      const updated = Array.isArray(parsed) ? parsed.filter((item) => item.id !== id) : [];
+      const updated = Array.isArray(parsed)
+        ? parsed.filter((item) => item.id !== id)
+        : [];
 
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       refreshSavedEstimates();
@@ -1793,78 +1824,84 @@ const resetItemsOnly = () => {
   }, [supplyPrice, totalAmount, vat, vatMode]);
 
   return (
-    <div className="min-h-screen bg-[#f3f5f8] px-4 py-4 xl:px-5 xl:py-5">
-      <div className="mx-auto grid max-w-[2360px] grid-cols-1 gap-5 xl:grid-cols-[1080px_minmax(0,1fr)]">
+    <div className="min-h-screen bg-[#07090c] px-4 py-4 xl:px-5 xl:py-5">
+   <div className="mx-auto grid max-w-[2520px] grid-cols-1 gap-5 xl:grid-cols-[1180px_minmax(0,1fr)]">
         <div className="space-y-4">
-          <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-4 shadow-sm">
-            <h1 className="text-[19px] font-bold text-gray-900">견적서</h1>
-            <p className="mt-1 text-[12px] text-gray-500">
+          <div className="rounded-[30px] border border-[#26313b] bg-[linear-gradient(135deg,#1d2127_0%,#161b22_100%)] px-6 py-6 shadow-[0_20px_40px_rgba(0,0,0,0.34)] ring-1 ring-[rgba(255,255,255,0.02)]">
+            <h1 className="text-[30px] font-bold tracking-[-0.03em] text-[#f7f8fb]">
+              견적서
+            </h1>
+            <p className="mt-2 text-[13px] leading-6 text-[#a9b4bf]">
               거래명세서 기준의 문서형 미리보기를 유지하되, 좌측 입력 작업감은 기존 견적서처럼 넓고 편하게 구성한 화면
             </p>
           </div>
 
-          <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-5 shadow-sm">
+          <div className={cardClass}>
             <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h2 className="text-[16px] font-semibold text-gray-900">거래처 선택</h2>
-                <p className="mt-1 text-[12px] text-gray-500">
+                <h2 className={sectionTitleClass}>거래처 선택</h2>
+                <p className={sectionDescriptionClass}>
                   저장된 거래처를 검색하고 선택하면 거래처 정보에 자동 반영됩니다.
                 </p>
               </div>
 
               <div className="flex flex-wrap gap-2">
                 <button
+                  type="button"
                   onClick={() => setShowClientSearch((prev) => !prev)}
-                  className="rounded-2xl border border-gray-300 bg-white px-4 py-2 text-[13px] font-medium text-gray-800"
+                  className={outlineBlueButtonClass}
                 >
-                  {showClientSearch ? "거래처 검색 닫기" : "거래처 검색 열기"}
+                  거래처 검색 열기
                 </button>
 
                 <button
+                  type="button"
                   onClick={clearSelectedClient}
-                  className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-[13px] font-medium text-red-600"
+                  className={outlineBlueButtonClass}
                 >
                   거래처 초기화
                 </button>
               </div>
             </div>
 
-            <div className="rounded-[22px] border border-gray-200 bg-gray-50 px-4 py-3">
+            <div className="rounded-[24px] border border-[#27313b] bg-[#0f141a] px-4 py-4">
               {clientName ? (
-                <div className="grid grid-cols-1 gap-1 text-[13px] text-gray-700 md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-2 text-[13px] text-[#dce6ef] md:grid-cols-2">
                   <div>
-                    <span className="font-semibold text-gray-900">업체명:</span> {clientName}
+                    <span className="font-semibold text-[#f7f8fb]">업체명:</span> {clientName}
                   </div>
                   <div>
-                    <span className="font-semibold text-gray-900">대표자:</span>{" "}
+                    <span className="font-semibold text-[#f7f8fb]">대표자:</span>{" "}
                     {managerName || "-"}
                   </div>
                   <div>
-                    <span className="font-semibold text-gray-900">전화:</span> {phone || "-"}
+                    <span className="font-semibold text-[#f7f8fb]">전화:</span> {phone || "-"}
                   </div>
                   <div>
-                    <span className="font-semibold text-gray-900">이메일:</span> {email || "-"}
+                    <span className="font-semibold text-[#f7f8fb]">이메일:</span> {email || "-"}
                   </div>
                 </div>
               ) : (
-                <div className="text-[13px] text-gray-500">아직 선택된 거래처가 없습니다.</div>
+                <div className="text-[13px] text-[#8391a0]">
+                  아직 선택된 거래처가 없습니다.
+                </div>
               )}
             </div>
 
             {showClientSearch ? (
-              <div className="mt-4 rounded-[24px] border border-gray-200 bg-[#fbfbfc]">
-                <div className="border-b border-gray-200 px-4 py-3">
+              <div className="mt-4 rounded-[24px] border border-[#27313b] bg-[#0f141a]">
+                <div className="border-b border-[#27313b] px-4 py-3">
                   <input
                     value={clientSearch}
                     onChange={(e) => setClientSearch(e.target.value)}
                     placeholder="거래처명 / 대표자 / 번호 / 전화 검색"
-                    className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
+                    className={fieldInputClass}
                   />
                 </div>
 
                 <div className="max-h-[320px] overflow-y-auto p-4">
                   {filteredClients.length === 0 ? (
-                    <div className="rounded-[20px] border border-dashed border-gray-300 p-6 text-center text-[13px] text-gray-500">
+                    <div className="rounded-[22px] border border-dashed border-[#34404b] p-6 text-center text-[13px] text-[#8391a0]">
                       {savedClients.length === 0
                         ? "등록된 거래처가 없습니다."
                         : "검색 결과가 없습니다."}
@@ -1874,30 +1911,31 @@ const resetItemsOnly = () => {
                       {filteredClients.map((client) => (
                         <div
                           key={client.id}
-                          className="rounded-[20px] border border-gray-200 bg-white p-4"
+                          className="rounded-[22px] border border-[#27313b] bg-[#131921] p-4"
                         >
                           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                             <div className="space-y-1">
-                              <div className="text-[16px] font-semibold text-gray-900">
+                              <div className="text-[17px] font-semibold text-[#f7f8fb]">
                                 {client.name}
                               </div>
-                              <div className="text-[13px] text-gray-600">
+                              <div className="text-[13px] text-[#c0cdd8]">
                                 {client.owner || "-"} / {client.businessNumber || "-"}
                               </div>
-                              <div className="text-[13px] text-gray-600">
+                              <div className="text-[13px] text-[#c0cdd8]">
                                 전화번호: {client.phone || "-"}
                               </div>
-                              <div className="text-[13px] text-gray-600">
+                              <div className="text-[13px] text-[#c0cdd8]">
                                 이메일: {client.email || "-"}
                               </div>
-                              <div className="text-[13px] text-gray-600">
+                              <div className="text-[13px] text-[#c0cdd8]">
                                 주소: {client.address || "-"}
                               </div>
                             </div>
 
                             <button
+                              type="button"
                               onClick={() => handleSelectClient(client)}
-                              className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2 text-[13px] font-semibold text-blue-600"
+                              className={outlineBlueButtonClass}
                             >
                               이 거래처 선택
                             </button>
@@ -1911,65 +1949,49 @@ const resetItemsOnly = () => {
             ) : null}
           </div>
 
-          <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-5 shadow-sm">
-            <h2 className="mb-3 text-[16px] font-semibold text-gray-900">기본 정보</h2>
+          <div className={cardClass}>
+            <h2 className={sectionTitleClass}>기본 정보</h2>
 
-            <div className="grid grid-cols-1 gap-3">
+            <div className="mt-4 grid grid-cols-1 gap-3">
               <label className="block">
-                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">
+                <span className="mb-2 block text-[12px] font-semibold tracking-[0.01em] text-[#d8e2eb]">
                   견적번호
                 </span>
                 <input
                   value={estimateNumber}
                   onChange={(e) => syncCurrentEstimateNumber(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
+                  className={fieldInputClass}
                   placeholder="WB-2026-0001"
                 />
               </label>
-
             </div>
           </div>
 
-          <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-5 shadow-sm">
-<div className="mb-3 flex items-center justify-between">
-  {/* 왼쪽: 제목 + RESET */}
-  <div className="flex items-center gap-2">
-    <h2 className="text-[16px] font-semibold text-gray-900">
-      품목 정보
-    </h2>
+          <div className={cardClass}>
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h2 className={sectionTitleClass}>품목 정보</h2>
 
-    <button
-      type="button"
-      onClick={resetItemsOnly}
-      className="
-        inline-flex items-center justify-center
-        h-7 px-3
-        rounded-full
-        border border-orange-200
-        bg-orange-50
-        text-[10px] font-semibold tracking-[0.12em]
-        text-orange-500
-        transition
-        hover:bg-orange-100 hover:border-orange-300
-        active:scale-[0.97]
-      "
-    >
-      RESET
-    </button>
-  </div>
+                <button
+                  type="button"
+                  onClick={resetItemsOnly}
+                  className={miniBlueChipClass}
+                >
+                  RESET
+                </button>
+              </div>
 
-  {/* 오른쪽: 행 추가 */}
-  <button
-    type="button"
-    onClick={handleAddItem}
-    className="rounded-2xl bg-gray-900 px-4 py-2 text-[13px] font-medium text-white"
-  >
-    행 추가
-  </button>
-</div>
+              <button
+                type="button"
+                onClick={handleAddItem}
+                className={primaryButtonClass}
+              >
+                행 추가
+              </button>
+            </div>
 
             <div
-              className="rounded-[24px] border border-gray-200 bg-[#fbfbfc]"
+              className="rounded-[24px] border border-[#27313b] bg-[#0f141a]"
               onPaste={(e) => {
                 const text = e.clipboardData.getData("text");
                 if (!text || !text.includes("\t")) return;
@@ -1977,88 +1999,95 @@ const resetItemsOnly = () => {
                 handlePasteRows(text);
               }}
             >
-              <div className="border-b border-gray-200 px-4 py-3">
+              <div className="border-b border-[#27313b] px-4 py-3">
                 <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                   <div>
-                    <p className="text-[12px] text-gray-500">
+                    <p className="text-[12px] leading-5 text-[#8d9aaa]">
                       거래명세서처럼 탭 / 엔터 / 방향키 이동, 규격 / 단위 입력, 선택 행 이동을 지원합니다.
                     </p>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
                     <button
+                      type="button"
                       onClick={handleSelectAll}
-                      className={`rounded-2xl border px-4 py-2 text-[13px] font-medium ${
+                      className={`inline-flex h-[42px] items-center justify-center rounded-2xl border px-4 text-[13px] font-semibold transition ${
                         items.length > 0 && selectedRowIds.length === items.length
-                          ? "border-gray-900 bg-gray-900 text-white"
-                          : "border-gray-300 bg-white text-gray-800"
+                          ? "border-[#22b7ff] bg-[#102433] text-[#74ddff]"
+                          : "border-[#2b82b6] bg-[#0d1319] text-[#6fd6ff] hover:border-[#22b7ff] hover:text-white"
                       }`}
                     >
                       전체 선택
                     </button>
+
                     <button
+                      type="button"
                       onClick={handleClearSelection}
-                      className="rounded-2xl border border-gray-300 bg-white px-4 py-2 text-[13px] font-medium text-gray-800"
+                      className={outlineBlueButtonClass}
                     >
                       선택 해제
                     </button>
+
                     <button
+                      type="button"
                       onClick={handleDeleteSelected}
-                      className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-[13px] font-medium text-red-600"
+                      className={outlineBlueButtonClass}
                     >
                       선택 행 삭제
                     </button>
+
                     <button
+                      type="button"
                       onClick={handleDuplicateSelected}
-                      className="rounded-2xl border border-gray-300 bg-white px-4 py-2 text-[13px] font-medium text-gray-800"
+                      className={outlineBlueButtonClass}
                     >
                       선택 복제
                     </button>
- 
                   </div>
                 </div>
 
-                <div className="mt-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-[12px] text-gray-600">
-                  현재 선택된 행: <span className="font-semibold">{selectedRowIds.length}</span>
+                <div className="mt-3 rounded-2xl border border-[#27313b] bg-[#0b1016] px-4 py-3 text-[12px] text-[#a8b4c1]">
+                  현재 선택된 행:{" "}
+                  <span className="font-semibold text-[#f7f8fb]">{selectedRowIds.length}</span>
                   개
                 </div>
               </div>
 
               <div className="overflow-x-auto">
                 <div className="min-w-[1400px]">
-                  <div className="grid grid-cols-[60px_minmax(260px,2.2fr)_minmax(160px,1.2fr)_90px_90px_140px_150px_110px_150px] border-b border-gray-200 bg-[#f3f5f8] text-[12px] font-semibold text-gray-700">
-                    <div className="flex h-11 items-center justify-center border-r border-gray-200">
+                  <div className="grid grid-cols-[60px_minmax(260px,2.2fr)_minmax(160px,1.2fr)_90px_90px_140px_150px_110px_150px] border-b border-[#27313b] bg-[linear-gradient(135deg,#1d232b_0%,#171d24_100%)] text-[12px] font-semibold text-[#dce6ef]">
+                    <div className="flex h-11 items-center justify-center border-r border-[#27313b]">
                       선택
                     </div>
-                    <div className="flex h-11 items-center border-r border-gray-200 px-3">
+                    <div className="flex h-11 items-center border-r border-[#27313b] px-3">
                       품목
                     </div>
-                    <div className="flex h-11 items-center border-r border-gray-200 px-3">
+                    <div className="flex h-11 items-center border-r border-[#27313b] px-3">
                       규격
                     </div>
-                    <div className="flex h-11 items-center justify-center border-r border-gray-200">
+                    <div className="flex h-11 items-center justify-center border-r border-[#27313b]">
                       단위
                     </div>
-                    <div className="flex h-11 items-center justify-center border-r border-gray-200">
+                    <div className="flex h-11 items-center justify-center border-r border-[#27313b]">
                       수량
                     </div>
-                    <div className="flex h-11 items-center justify-center border-r border-gray-200">
+                    <div className="flex h-11 items-center justify-center border-r border-[#27313b]">
                       {vatMode === "included"
                         ? "단가(VAT포함)"
                         : vatMode === "separate"
                         ? "단가(VAT별도)"
                         : "단가"}
                     </div>
-                    <div className="flex h-11 items-center justify-center border-r border-gray-200">
+                    <div className="flex h-11 items-center justify-center border-r border-[#27313b]">
                       공급가액
                     </div>
-                    <div className="flex h-11 items-center justify-center border-r border-gray-200">
+                    <div className="flex h-11 items-center justify-center border-r border-[#27313b]">
                       세액
                     </div>
                     <div className="flex h-11 items-center justify-center">작업</div>
                   </div>
 
-                  <div className="max-h-[560px] overflow-y-auto">
+                  <div className="max-h-[560px] overflow-y-auto bg-[#10151b]">
                     {items.map((item, index) => (
                       <EstimateRow
                         key={item.id}
@@ -2077,7 +2106,7 @@ const resetItemsOnly = () => {
                     ))}
 
                     {items.length === 0 ? (
-                      <div className="p-6 text-center text-[13px] text-gray-500">
+                      <div className="p-6 text-center text-[13px] text-[#8391a0]">
                         품목이 없습니다.
                       </div>
                     ) : null}
@@ -2086,9 +2115,9 @@ const resetItemsOnly = () => {
               </div>
             </div>
 
-            <div className="mt-3">
+            <div className="mt-4">
               <label className="block">
-                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">
+                <span className="mb-2 block text-[12px] font-semibold tracking-[0.01em] text-[#d8e2eb]">
                   부가세 방식
                 </span>
                 <select
@@ -2096,9 +2125,11 @@ const resetItemsOnly = () => {
                   onChange={(e) => {
                     const nextMode = e.target.value as VatMode;
                     setVatMode(nextMode);
-                    setItems((prev) => prev.map((item) => sanitizeLineItem(item, nextMode)));
+                    setItems((prev) =>
+                      prev.map((item) => sanitizeLineItem(item, nextMode))
+                    );
                   }}
-                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
+                  className={fieldInputClass}
                 >
                   <option value="included">부가세 포함</option>
                   <option value="separate">부가세 별도</option>
@@ -2108,151 +2139,95 @@ const resetItemsOnly = () => {
             </div>
           </div>
 
-          <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-5 shadow-sm">
-            <h2 className="mb-3 text-[16px] font-semibold text-gray-900">거래처 정보</h2>
+          <div className={cardClass}>
+            <h2 className={sectionTitleClass}>견적 상세 정보</h2>
 
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
               <label className="block">
-                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">
-                  상호
-                </span>
-                <input
-                  value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
-                  placeholder="거래처명"
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">
-                  담당자명
-                </span>
-                <input
-                  value={managerName}
-                  onChange={(e) => setManagerName(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
-                  placeholder="담당자명"
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">
-                  연락처
-                </span>
-                <input
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
-                  placeholder="연락처"
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">
-                  이메일
-                </span>
-                <input
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
-                  placeholder="이메일"
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">
+                <span className="mb-2 block text-[12px] font-semibold text-[#d8e2eb]">
                   납품조건
                 </span>
                 <input
                   value={deliveryCondition}
                   onChange={(e) => setDeliveryCondition(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
-                  placeholder="예: 선입금 후 제작"
+                  className={fieldInputClass}
+                  placeholder="예: 택배 / 직납 / 화물"
                 />
               </label>
 
               <label className="block">
-                <span className="mb-1.5 block text-[12px] font-medium text-gray-700">
+                <span className="mb-2 block text-[12px] font-semibold text-[#d8e2eb]">
                   유효기간
                 </span>
                 <input
                   value={validUntil}
                   onChange={(e) => setValidUntil(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-300 px-4 py-2.5 text-[14px] outline-none focus:border-gray-900"
-                  placeholder="예: 발행일 기준 7일 / 2026-03-31"
+                  className={fieldInputClass}
+                  placeholder="예: 2026-04-30"
                 />
               </label>
             </div>
           </div>
 
-          <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-5 shadow-sm">
-            <h2 className="mb-3 text-[16px] font-semibold text-gray-900">자동 계산 결과</h2>
+          <div className={cardClass}>
+            <h2 className={sectionTitleClass}>자동 계산 결과</h2>
 
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-[22px] border border-gray-200 bg-gray-50 p-4">
-                <div className="text-[12px] text-gray-500">공급가</div>
-                <div className="mt-2 text-[24px] font-bold text-gray-900">
-                  {formatNumber(supplyPrice)}원
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+              <div className="rounded-[22px] border border-[#27313b] bg-[#0f141a] p-4">
+                <div className="text-[12px] font-semibold tracking-[0.08em] text-[#8d9aaa]">
+                  공급가액
+                </div>
+                <div className="mt-2 text-[24px] font-bold tracking-[-0.03em] text-[#f7f8fb]">
+                  {formatNumber(supplyPrice)}
                 </div>
               </div>
 
-              <div className="rounded-[22px] border border-gray-200 bg-gray-50 p-4">
-                <div className="text-[12px] text-gray-500">VAT</div>
-                <div className="mt-2 text-[24px] font-bold text-gray-900">
-                  {formatNumber(vat)}원
+              <div className="rounded-[22px] border border-[#27313b] bg-[#0f141a] p-4">
+                <div className="text-[12px] font-semibold tracking-[0.08em] text-[#8d9aaa]">
+                  부가세
+                </div>
+                <div className="mt-2 text-[24px] font-bold tracking-[-0.03em] text-[#f7f8fb]">
+                  {formatNumber(vat)}
                 </div>
               </div>
 
-              <div className="rounded-[22px] border border-gray-200 bg-gray-50 p-4">
-                <div className="text-[12px] text-gray-500">총금액</div>
-                <div className="mt-2 text-[24px] font-bold text-gray-900">
-                  {formatNumber(totalAmount)}원
+              <div className="rounded-[22px] border border-[#22b7ff]/50 bg-[linear-gradient(135deg,#0d1e2c_0%,#0a1822_100%)] p-4">
+                <div className="text-[12px] font-semibold tracking-[0.08em] text-[#7fe4ff]">
+                  총금액
+                </div>
+                <div className="mt-2 text-[26px] font-bold tracking-[-0.03em] text-white">
+                  {formatNumber(totalAmount)}
                 </div>
               </div>
             </div>
+
+            <div className="mt-4 rounded-[22px] border border-[#27313b] bg-[#0f141a] px-4 py-4 text-[13px] leading-6 text-[#dce6ef]">
+              {vatSummaryText}
+            </div>
           </div>
 
-          <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-5 shadow-sm">
-            <h2 className="mb-3 text-[16px] font-semibold text-gray-900">저장 / 출력</h2>
+          <div className={cardClass}>
+            <h2 className={sectionTitleClass}>저장 / 출력</h2>
 
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-              <button
-                onClick={handleResetEstimate}
-                className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2.5 text-[13px] font-semibold text-red-600"
-              >
-                초기화
-              </button>
-
-              <button
-                onClick={handleDownloadPng}
-                className="rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-semibold text-gray-900"
-              >
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button type="button" onClick={handleDownloadPng} className={outlineBlueButtonClass}>
                 PNG 저장
               </button>
 
-              <button
-                onClick={handleDownloadJpg}
-                className="rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-semibold text-gray-900"
-              >
+              <button type="button" onClick={handleDownloadJpg} className={outlineBlueButtonClass}>
                 JPG 저장
               </button>
 
-              <button
-                onClick={handleDownloadPdf}
-                className="rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-semibold text-gray-900"
-              >
+              <button type="button" onClick={handleDownloadPdf} className={outlineBlueButtonClass}>
                 PDF 저장
               </button>
 
-              <button
-                onClick={handlePrint}
-                className="rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-semibold text-gray-900"
-              >
+              <button type="button" onClick={handlePrint} className={outlineBlueButtonClass}>
                 인쇄
               </button>
 
               <button
+                type="button"
                 onClick={() => {
                   const subject = encodeURIComponent(`[견적서] ${estimateTitle || "견적서"}`);
                   const body = encodeURIComponent(
@@ -2265,55 +2240,67 @@ const resetItemsOnly = () => {
 
                   window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
                 }}
-                className="rounded-2xl border border-blue-200 bg-white px-4 py-2.5 text-[13px] font-semibold text-blue-700"
+                className={outlineBlueButtonClass}
               >
                 메일 발송
               </button>
             </div>
 
             <button
+              type="button"
               onClick={handleSaveEstimate}
-              className="mt-3 w-full rounded-2xl bg-gray-900 px-4 py-2.5 text-[13px] font-semibold text-white"
+              className="mt-3 inline-flex h-[46px] w-full items-center justify-center rounded-2xl border border-[#22b7ff] bg-[#1aa7f7] px-4 text-[13px] font-bold text-white transition hover:bg-[#2eb5ff] hover:shadow-[0_0_18px_rgba(34,183,255,0.18)]"
             >
               견적 저장
             </button>
+
+            <button
+              type="button"
+              onClick={handleResetEstimate}
+              className="mt-3 inline-flex h-[42px] w-full items-center justify-center rounded-2xl border border-[#2b82b6] bg-[#0d1319] px-4 text-[13px] font-semibold text-[#6fd6ff] transition hover:border-[#22b7ff] hover:text-white"
+            >
+              새 견적 작성
+            </button>
           </div>
 
-          <div className="rounded-[26px] border border-gray-200 bg-white px-5 py-5 shadow-sm">
-            <h2 className="mb-3 text-[16px] font-semibold text-gray-900">저장된 견적 목록</h2>
+          <div className={cardClass}>
+            <h2 className={sectionTitleClass}>저장된 견적 목록</h2>
 
             {savedEstimates.length === 0 ? (
-              <div className="rounded-[22px] border border-dashed border-gray-300 p-6 text-[13px] text-gray-500">
+              <div className="mt-4 rounded-[22px] border border-dashed border-[#34404b] p-6 text-[13px] text-[#8391a0]">
                 저장된 견적이 없습니다.
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="mt-4 space-y-3">
                 {savedEstimates.map((item) => (
                   <div
                     key={item.id}
-                    className="rounded-[22px] border border-gray-200 p-4"
+                    className="rounded-[22px] border border-[#27313b] bg-[#0f141a] p-4"
                   >
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <div>
-                        <div className="text-[14px] font-semibold text-gray-900">
+                        <div className="text-[14px] font-semibold text-[#f7f8fb]">
                           {item.estimateNumber} / {item.productName}
                         </div>
-                        <div className="mt-1 text-[13px] text-gray-500">
+                        <div className="mt-1 text-[13px] text-[#a9b4bf]">
                           거래처: {item.clientName || "-"} / 총금액: {formatNumber(item.totalAmount)}
                           원 / 저장일: {item.date}
                         </div>
                       </div>
 
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <button
+                          type="button"
                           onClick={() => handleLoadEstimate(item)}
-                          className="rounded-2xl bg-gray-900 px-4 py-2 text-[13px] font-medium text-white"
+                          className={outlineBlueButtonClass}
                         >
                           불러오기
                         </button>
+
                         <button
+                          type="button"
                           onClick={() => handleDeleteEstimate(item.id)}
-                          className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-[13px] font-medium text-red-600"
+                          className={outlineBlueButtonClass}
                         >
                           삭제
                         </button>
@@ -2327,96 +2314,94 @@ const resetItemsOnly = () => {
         </div>
 
         <div className="xl:sticky xl:top-5 xl:self-start">
-          <div className="rounded-[28px] border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between px-1">
-              <h2 className="text-[18px] font-semibold text-gray-900">A4 미리보기</h2>
-              <p className="text-[11px] text-gray-500">견적서 문서형 미리보기</p>
+          <div className="rounded-[30px] border border-[#26313b] bg-[#171c22] px-5 py-5 shadow-[0_18px_34px_rgba(0,0,0,0.28)] ring-1 ring-[rgba(255,255,255,0.02)]">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className={sectionTitleClass}>견적서 미리보기</h2>
+                <p className={sectionDescriptionClass}>
+                  우측 A4 문서 내용은 조금 키워서 가독성을 높인 최종 미리보기입니다.
+                </p>
+              </div>
             </div>
 
-            <div className="overflow-auto rounded-[22px] bg-[#edf1f6] p-3">
-              <div className="mx-auto flex justify-center">
+            <div className="overflow-auto rounded-[26px] border border-[#27313b] bg-[#0b0f14] p-4">
+              <div className="mx-auto w-[860px] scale-[1.02] origin-top">
                 <div
                   id="estimate-print-area"
-                  className="w-[794px] min-h-[1123px] bg-white px-[20px] py-[22px] text-black"
+                  className="min-h-[1123px] rounded-[8px] bg-white p-[24px] text-[#111]"
                 >
-                  <div className="mb-[8px] flex items-end justify-between">
-                    <div className="text-[31px] font-extrabold tracking-[-0.02em] text-gray-900">
+                  <div className="flex items-end justify-between gap-4">
+                    <div className="text-[32px] font-extrabold tracking-[-0.04em]">
                       견적서 (ESTIMATE)
                     </div>
-
-                    <div className="text-[23px] font-extrabold tracking-[-0.01em] text-gray-900">
-                      {displayCompanyName}
+                    <div className="text-right">
+                      {resolvedLogo ? (
+                        <div className="mb-2 flex justify-end">
+                          <img
+                            src={resolvedLogo}
+                            alt="회사 로고"
+                            className="h-[52px] object-contain"
+                          />
+                        </div>
+                      ) : null}
+                      <div className="text-[24px] font-extrabold tracking-[-0.03em]">
+                        {displayCompanyName}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="mb-[10px] h-[1.5px] w-full bg-gray-900"></div>
+                  <div className="mt-2 h-[2px] bg-[#111]" />
 
-                  <div className="mb-[10px] grid grid-cols-2 gap-[16px]">
-                    <table className="w-full border-collapse">
+                  <div className="mt-4 grid grid-cols-2 gap-4">
+                    <table className="w-full border-collapse text-[14px]">
                       <tbody>
                         <tr>
-                          <td className="w-[64px] py-[3px] text-[14px] font-bold text-gray-900">
-                            작성일
-                          </td>
-                          <td className="py-[3px] text-[14px] leading-[1.45] text-gray-900">
-                            {today}
-                          </td>
+                          <td className="w-[70px] py-[3px] pr-2 font-bold">작성일</td>
+                          <td className="py-[3px]">{today}</td>
                         </tr>
                         <tr>
-                          <td className="py-[3px] text-[14px] font-bold text-gray-900">상호</td>
-                          <td className="py-[3px] text-[14px] leading-[1.45] text-gray-900">
-                            {clientName || "-"}
-                          </td>
+                          <td className="w-[70px] py-[3px] pr-2 font-bold">상호</td>
+                          <td className="py-[3px]">{clientName || "-"}</td>
                         </tr>
                         <tr>
-                          <td className="py-[3px] text-[14px] font-bold text-gray-900">제목</td>
-                          <td className="py-[3px] text-[14px] leading-[1.45] text-gray-900">
-                            {estimateTitle || "-"}
-                          </td>
+                          <td className="w-[70px] py-[3px] pr-2 font-bold">제목</td>
+                          <td className="py-[3px]">{estimateTitle || "-"}</td>
                         </tr>
                         <tr>
-                          <td className="py-[3px] text-[14px] font-bold text-gray-900">합계</td>
-                          <td className="py-[3px] text-[15px] font-black tracking-[-0.2px] leading-[1.45] text-gray-900">
+                          <td className="w-[70px] py-[3px] pr-2 font-bold">합계</td>
+                          <td className="py-[3px] text-[15px] font-extrabold">
                             {vatSummaryText}
                           </td>
                         </tr>
                       </tbody>
                     </table>
 
-                    <table className="w-full border-collapse">
+                    <table className="w-full border-collapse text-[14px]">
                       <tbody>
                         <tr>
-                          <td className="py-[3px] text-[14px] leading-[1.45] text-gray-900">
-                            {displayCompanyName}
-                          </td>
+                          <td className="py-[3px]">{displayCompanyName}</td>
                         </tr>
                         <tr>
-                          <td className="py-[3px] text-[14px] leading-[1.45] text-gray-900">
-                            등록번호 {displayBusinessNumber}
-                          </td>
+                          <td className="py-[3px]">등록번호 {displayBusinessNumber}</td>
                         </tr>
                         <tr>
-                          <td className="py-[3px] text-[14px] leading-[1.45] text-gray-900">
-                            {displayAddress}
-                          </td>
+                          <td className="py-[3px]">{displayAddress}</td>
                         </tr>
                         <tr>
-                          <td className="py-[3px] text-[14px] leading-[1.45] text-gray-900">
-                            TEL : {displayCompanyPhone}
-                          </td>
+                          <td className="py-[3px]">TEL : {displayCompanyPhone}</td>
                         </tr>
                         <tr>
-                          <td className="py-[3px] text-[14px] leading-[1.45] text-gray-900">
+                          <td className="py-[3px]">
                             <span className="inline-flex items-center whitespace-nowrap">
-                              <span>대표 : {displayCeoName}</span>
+                              대표 : {displayCeoName}
                               {resolvedStamp ? (
                                 <img
                                   src={resolvedStamp}
-                                  alt="도장"
-                                  className="ml-[10px] h-[56px] w-[56px] shrink-0 object-contain"
+                                  alt="직인"
+                                  className="ml-[10px] h-[56px] w-[56px] object-contain"
                                 />
                               ) : (
-                                <span className="ml-[10px] inline-flex h-[56px] w-[56px] shrink-0 rotate-[-16deg] items-center justify-center rounded-full border-[1.8px] border-red-600 text-[12px] font-bold text-red-600">
+                                <span className="ml-[10px] inline-flex h-[56px] w-[56px] items-center justify-center rounded-full border-[1.8px] border-red-600 text-[12px] font-bold text-red-600">
                                   직인
                                 </span>
                               )}
@@ -2427,7 +2412,7 @@ const resetItemsOnly = () => {
                     </table>
                   </div>
 
-                  <table className="w-full table-fixed border-collapse">
+                  <table className="mt-3 w-full table-fixed border-collapse text-[13px]">
                     <colgroup>
                       <col style={{ width: "10%" }} />
                       <col style={{ width: "22%" }} />
@@ -2440,90 +2425,92 @@ const resetItemsOnly = () => {
                     </colgroup>
                     <thead>
                       <tr className="bg-[#f5f5f5]">
-                        <th className="border border-[#333] px-[5px] py-[6px] text-center text-[13px] font-bold">
+                        <th className="h-[36px] border border-[#333] px-[5px] font-bold">
                           구분
                         </th>
-                        <th className="border border-[#333] px-[5px] py-[6px] text-center text-[13px] font-bold">
+                        <th className="h-[36px] border border-[#333] px-[5px] font-bold">
                           품목
                         </th>
-                        <th className="border border-[#333] px-[5px] py-[6px] text-center text-[13px] font-bold">
+                        <th className="h-[36px] border border-[#333] px-[5px] font-bold">
                           규격
                         </th>
-                        <th className="border border-[#333] px-[5px] py-[6px] text-center text-[13px] font-bold">
+                        <th className="h-[36px] border border-[#333] px-[5px] font-bold">
                           단위
                         </th>
-                        <th className="border border-[#333] px-[5px] py-[6px] text-center text-[13px] font-bold">
+                        <th className="h-[36px] border border-[#333] px-[5px] font-bold">
                           수량
                         </th>
-                        <th className="border border-[#333] px-[5px] py-[6px] text-center text-[13px] font-bold">
+                        <th className="h-[36px] border border-[#333] px-[5px] font-bold">
                           단가
                         </th>
-                        <th className="border border-[#333] px-[5px] py-[6px] text-center text-[13px] font-bold">
+                        <th className="h-[36px] border border-[#333] px-[5px] font-bold">
                           공급가액
                         </th>
-                        <th className="border border-[#333] px-[5px] py-[6px] text-center text-[13px] font-bold">
+                        <th className="h-[36px] border border-[#333] px-[5px] font-bold">
                           비고
                         </th>
                       </tr>
                     </thead>
                     <tbody>
                       {previewRows.map((row, index) => (
-                        <tr key={index}>
-                          <td className="h-[35px] border border-[#333] px-[5px] py-[3px] text-center text-[13.5px] leading-[1.35]">
-                            {row.category || ""}
+                        <tr key={`${row.item}-${index}`}>
+                          <td className="h-[35px] border border-[#333] px-[5px] text-center">
+                            {row.category || "\u00A0"}
                           </td>
-                          <td className="h-[35px] border border-[#333] px-[5px] py-[3px] text-left text-[13.5px] leading-[1.35]">
-                            {row.item || ""}
+                          <td className="h-[35px] border border-[#333] px-[5px] text-left">
+                            {row.item || "\u00A0"}
                           </td>
-                          <td className="h-[35px] border border-[#333] px-[5px] py-[3px] text-center text-[13.5px] leading-[1.35]">
-                            {row.spec || ""}
+                          <td className="h-[35px] border border-[#333] px-[5px] text-center">
+                            {row.spec || "\u00A0"}
                           </td>
-                          <td className="h-[35px] border border-[#333] px-[5px] py-[3px] text-center text-[13.5px] leading-[1.35]">
-                            {row.unit || ""}
+                          <td className="h-[35px] border border-[#333] px-[5px] text-center">
+                            {row.unit || "\u00A0"}
                           </td>
-                          <td className="h-[35px] border border-[#333] px-[5px] py-[3px] text-center text-[13.5px] leading-[1.35]">
-                            {row.quantity || ""}
+                          <td className="h-[35px] border border-[#333] px-[5px] text-center">
+                            {row.quantity || "\u00A0"}
                           </td>
-                          <td className="h-[35px] border border-[#333] px-[5px] py-[3px] text-right text-[13.5px] leading-[1.35]">
-                            {row.price || ""}
+                          <td className="h-[35px] border border-[#333] px-[5px] text-right">
+                            {row.price || "\u00A0"}
                           </td>
-                          <td className="h-[35px] border border-[#333] px-[5px] py-[3px] text-right text-[13.5px] leading-[1.35]">
-                            {row.supplyAmount || ""}
+                          <td className="h-[35px] border border-[#333] px-[5px] text-right">
+                            {row.supplyAmount || "\u00A0"}
                           </td>
-                          <td className="h-[35px] border border-[#333] px-[5px] py-[3px] text-left text-[13.5px] leading-[1.35]">
-                            {row.note || ""}
+                          <td className="h-[35px] border border-[#333] px-[5px] text-left">
+                            {row.note || "\u00A0"}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
 
-                  <table className="mt-[1px] w-full border-collapse">
+                  <table className="mt-[1px] w-full border-collapse text-[15px] font-extrabold">
                     <tbody>
                       <tr>
-                        <td className="w-[65%] border border-[#333] bg-[#f5f5f5] px-3 py-[8px] text-center text-[15px] font-extrabold text-gray-900">
+                        <td className="w-[65%] border border-[#333] bg-[#f5f5f5] px-3 py-2 text-center">
                           총 금 액
                         </td>
-                        <td className="w-[35%] border border-[#333] bg-[#f5f5f5] px-3 py-[8px] text-right text-[15px] font-extrabold text-gray-900">
+                        <td className="w-[35%] border border-[#333] bg-[#f5f5f5] px-3 py-2 text-right">
                           {formatNumber(totalAmount)}
                         </td>
                       </tr>
                     </tbody>
                   </table>
 
-                  <div className="mt-[14px] text-[14px] leading-[1.72] text-gray-900">
-                    <div className="mb-[6px] text-[14px] font-extrabold">고객 준수사항</div>
+                  <div className="mt-4 text-[14px] leading-[1.7]">
+                    <div className="mb-1 text-[14px] font-extrabold">고객 준수사항</div>
                     <div>1. {getVatModeLabel(vatMode)}</div>
                     <div>2. 납품조건 : {deliveryCondition || "-"}</div>
                     <div>3. 유효기간 : {getDisplayDate(validUntil)}</div>
-                    <div>문의사항 : {displayCompanyPhone} / {displayCompanyEmail}</div>
+                    <div>
+                      문의사항 : {displayCompanyPhone} / {displayCompanyEmail}
+                    </div>
                     <div>계좌정보 : {displayAccountInfo}</div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div> 
+        </div>
       </div>
     </div>
   );
