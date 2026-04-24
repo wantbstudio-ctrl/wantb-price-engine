@@ -265,7 +265,10 @@ function toBufferFromPayload(payload = {}) {
       return Buffer.from(payload.base64, "base64");
     }
 
-    if (typeof payload.dataUrl === "string" && payload.dataUrl.startsWith("data:")) {
+    if (
+      typeof payload.dataUrl === "string" &&
+      payload.dataUrl.startsWith("data:")
+    ) {
       const base64 = payload.dataUrl.split(",")[1] || "";
       return Buffer.from(base64, "base64");
     }
@@ -285,7 +288,10 @@ async function saveBinaryFileInternal(payload = {}) {
   const saveDialogResult = await showSaveDialogInternal({
     title: payload.title || "파일 저장",
     defaultPath:
-      payload.defaultPath || payload.defaultFileName || payload.fileName || "output",
+      payload.defaultPath ||
+      payload.defaultFileName ||
+      payload.fileName ||
+      "output",
     filters: payload.filters,
   });
 
@@ -433,9 +439,27 @@ async function openExternalUrlInternal(url) {
 
 function getChromeCandidates() {
   return [
-    path.join(process.env["PROGRAMFILES"] || "C:\\Program Files", "Google", "Chrome", "Application", "chrome.exe"),
-    path.join(process.env["PROGRAMFILES(X86)"] || "C:\\Program Files (x86)", "Google", "Chrome", "Application", "chrome.exe"),
-    path.join(process.env["LOCALAPPDATA"] || "", "Google", "Chrome", "Application", "chrome.exe"),
+    path.join(
+      process.env["PROGRAMFILES"] || "C:\\Program Files",
+      "Google",
+      "Chrome",
+      "Application",
+      "chrome.exe"
+    ),
+    path.join(
+      process.env["PROGRAMFILES(X86)"] || "C:\\Program Files (x86)",
+      "Google",
+      "Chrome",
+      "Application",
+      "chrome.exe"
+    ),
+    path.join(
+      process.env["LOCALAPPDATA"] || "",
+      "Google",
+      "Chrome",
+      "Application",
+      "chrome.exe"
+    ),
   ].filter(Boolean);
 }
 
@@ -492,6 +516,65 @@ async function openHometaxWithChrome() {
       });
     });
   });
+}
+
+async function openUrlWithChrome(url) {
+  try {
+    const targetUrl = normalizeExternalUrl(url);
+    const chromePath = findChromePath();
+
+    writeDebugLog("openUrlWithChrome start", {
+      input: url,
+      targetUrl,
+      chromePath,
+    });
+
+    if (!targetUrl) {
+      return {
+        success: false,
+        message: "URL이 없습니다.",
+      };
+    }
+
+    if (!chromePath) {
+      writeDebugLog("chrome executable not found, fallback to shell.openExternal");
+      return await openExternalUrlInternal(targetUrl);
+    }
+
+    return await new Promise((resolve) => {
+      const args = ["--new-window", targetUrl];
+
+      execFile(chromePath, args, (error) => {
+        if (error) {
+          writeDebugLog("openUrlWithChrome failed", error?.message || error);
+
+          resolve({
+            success: false,
+            message: error?.message || "Chrome 실행 실패",
+          });
+          return;
+        }
+
+        writeDebugLog("openUrlWithChrome success", {
+          chromePath,
+          args,
+        });
+
+        resolve({
+          success: true,
+          message: "Chrome 실행 완료",
+          url: targetUrl,
+        });
+      });
+    });
+  } catch (error) {
+    writeDebugLog("openUrlWithChrome exception", error?.message || error);
+
+    return {
+      success: false,
+      message: "Chrome 실행 중 오류가 발생했습니다.",
+    };
+  }
 }
 
 async function createMainWindow() {
@@ -681,6 +764,11 @@ app.whenReady().then(async () => {
   ipcMain.handle("open-hometax-direct", async () => {
     writeDebugLog("ipcMain open-hometax-direct received");
     return await openHometaxWithChrome();
+  });
+
+  ipcMain.handle("open-url-with-chrome", async (_, url) => {
+    writeDebugLog("ipcMain open-url-with-chrome received", url);
+    return await openUrlWithChrome(url);
   });
 
   try {

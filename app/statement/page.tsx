@@ -528,7 +528,7 @@ const textareaClass =
   "w-full rounded-2xl border border-[#34404b] bg-[#0c1117] px-4 py-3 text-[14px] text-[#f4f8fb] outline-none placeholder:text-[#6f7b88] transition focus:border-[#22b7ff] focus:bg-[#10161d]";
 
 const titleClass =
-  "text-[18px] font-bold tracking-[-0.02em] text-[#f7f8fb]";
+  "text-[18px] font-light tracking-tight text-[#38BDF8]";
 
 const descClass =
   "mt-2 text-[13px] leading-6 text-[#a9b4bf]";
@@ -2710,9 +2710,9 @@ export default function StatementPage() {
       <div className="mx-auto grid max-w-[2520px] grid-cols-1 gap-5 xl:grid-cols-[1180px_minmax(0,1fr)]">
         <div className="space-y-4">
           <div className="rounded-[30px] border border-[#26313b] bg-[linear-gradient(135deg,#1d2127_0%,#161b22_100%)] px-6 py-6 shadow-[0_20px_40px_rgba(0,0,0,0.34)] ring-1 ring-[rgba(255,255,255,0.02)]">
-            <h1 className="text-[30px] font-bold tracking-[-0.03em] text-[#f7f8fb]">
-              거래명세서
-            </h1>
+            <h1 className="text-[29px] font-light tracking-tight text-[#38BDF8]">
+  거래명세서
+</h1>
             <p className="mt-2 text-[13px] leading-6 text-[#a9b4bf]">
               기존 거래명세서 문서 구조와 출력 엔진은 유지하면서, 좌측 작업 영역만 Dashboard/Estimate 기준의 다크 블루톤으로 정리한 화면
             </p>

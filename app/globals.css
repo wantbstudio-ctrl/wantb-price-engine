@@ -6,85 +6,315 @@
 /* 기본 설정 */
 /* ============================= */
 
+:root {
+  --wb-bg: #07090c;
+  --wb-surface: #11161d;
+  --wb-surface-2: #171d24;
+  --wb-surface-3: #1d242d;
+
+  --wb-border: #27313b;
+  --wb-border-strong: #34404b;
+
+  --wb-text: #f4f8fb;
+  --wb-text-soft: #dce6ef;
+  --wb-text-muted: #9fb0bf;
+  --wb-placeholder: #6f7f8f;
+
+  --wb-input-bg: #0c1117;
+  --wb-input-bg-hover: #111821;
+  --wb-input-bg-focus: #141b22;
+  --wb-input-border: #34404b;
+  --wb-input-border-focus: #22b7ff;
+  --wb-input-text: #f4f8fb;
+
+  --wb-accent: #38bdf8;
+  --wb-accent-strong: #22b7ff;
+  --wb-accent-soft: rgba(56, 189, 248, 0.16);
+
+  --wb-danger: #ef4444;
+  --wb-danger-soft: #1f1416;
+  --wb-danger-text: #fecaca;
+
+  --wb-scroll-track: #0b0f14;
+  --wb-scroll-thumb: #34404b;
+  --wb-scroll-thumb-hover: #465564;
+
+  --wb-selection-bg: #38bdf8;
+  --wb-selection-text: #08111d;
+
+  --wb-ring: 0 0 0 3px rgba(56, 189, 248, 0.16);
+
+  --wb-page-max: 2520px;
+  --wb-card-radius: 28px;
+  --wb-card-radius-sm: 24px;
+  --wb-control-radius: 16px;
+  --wb-input-radius: 14px;
+
+  --wb-card-padding: 20px;
+  --wb-card-padding-lg: 24px;
+}
+
+/* ============================= */
+/* Base */
+/* ============================= */
+
 html,
 body {
   margin: 0;
   padding: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     Roboto, "Noto Sans KR", sans-serif;
-  background-color: #f9fafb;
-  color: #111827;
 }
-
-/* ============================= */
-/* Electron drag 영역 */
-/* ============================= */
-
-/*
-❗ 절대 body나 전체 영역에 drag 걸지 마세요
-입력창 안먹는 원인 1순위입니다
-*/
 
 .drag-area {
   -webkit-app-region: drag;
 }
 
-.no-drag {
-  -webkit-app-region: no-drag;
+.no-drag,
+input,
+textarea,
+button,
+select {
+  -webkit-app-region: no-drag !important;
 }
-
-/* ============================= */
-/* 입력/버튼 정상 동작 강제 */
-/* ============================= */
 
 input,
 textarea,
 button,
 select {
   pointer-events: auto !important;
-  user-select: text !important;
-  -webkit-user-select: text !important;
-  -webkit-app-region: no-drag !important;
 }
-
-/* ============================= */
-/* 버튼 UX */
-/* ============================= */
-
-button {
-  cursor: pointer;
-}
-
-/* ============================= */
-/* 이미지 드래그 방지 */
-/* ============================= */
 
 img {
   -webkit-user-drag: none;
 }
 
+button {
+  cursor: pointer;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.12s ease;
+}
+
+button:active {
+  transform: translateY(0.5px);
+}
+
+button:focus-visible {
+  outline: none;
+  box-shadow: var(--wb-ring);
+}
+
 /* ============================= */
-/* 스크롤 */
+/* Form */
 /* ============================= */
 
+input,
+textarea,
+select {
+  background: var(--wb-input-bg);
+  border: 1px solid var(--wb-input-border);
+  color: var(--wb-input-text);
+  border-radius: var(--wb-input-radius);
+  outline: none;
+}
+
+input:hover,
+textarea:hover,
+select:hover {
+  background: var(--wb-input-bg-hover);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  background: var(--wb-input-bg-focus);
+  border-color: var(--wb-input-border-focus);
+  box-shadow: var(--wb-ring);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--wb-placeholder);
+}
+
+textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* ============================= */
+/* Components */
+/* ============================= */
+
+@layer components {
+  .wb-page {
+    @apply mx-auto grid min-h-screen grid-cols-1 gap-5;
+    max-width: var(--wb-page-max);
+  }
+
+  .wb-page-2col {
+    @apply xl:grid-cols-[1180px_minmax(0,1fr)];
+  }
+
+  .wb-card {
+    background: var(--wb-surface-2);
+    border: 1px solid var(--wb-border);
+    border-radius: var(--wb-card-radius);
+    padding: var(--wb-card-padding);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+  }
+
+  .wb-panel {
+    background: var(--wb-surface);
+    border: 1px solid var(--wb-border);
+    border-radius: var(--wb-card-radius-sm);
+    padding: 16px;
+  }
+
+  .wb-page-title {
+    color: var(--wb-text);
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .wb-section-title {
+    color: var(--wb-text);
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .wb-subtitle {
+    color: var(--wb-text-muted);
+    font-size: 14px;
+    line-height: 1.7;
+  }
+
+  /* ===================== */
+  /* 버튼 시스템 */
+  /* ===================== */
+
+  .wb-btn {
+    min-height: 42px;
+    padding: 10px 16px;
+    border-radius: var(--wb-control-radius);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.2;
+    border: 1px solid var(--wb-border);
+    background: var(--wb-surface);
+    color: var(--wb-text-soft);
+  }
+
+  .wb-btn:hover {
+    border-color: var(--wb-border-strong);
+    background: #151c24;
+    color: #ffffff;
+  }
+
+  /* Primary */
+  .wb-btn-primary {
+    border-color: var(--wb-accent);
+    color: #ffffff;
+    background: rgba(56, 189, 248, 0.04);
+    box-shadow:
+      0 0 0 1px rgba(56, 189, 248, 0.55),
+      0 0 14px rgba(56, 189, 248, 0.16);
+  }
+
+  .wb-btn-primary:hover {
+    border-color: #67d4ff;
+    background: rgba(56, 189, 248, 0.07);
+    box-shadow:
+      0 0 0 1px rgba(56, 189, 248, 0.72),
+      0 0 18px rgba(56, 189, 248, 0.22);
+  }
+
+  /* Secondary */
+  .wb-btn-secondary {
+    background: var(--wb-surface);
+    border-color: var(--wb-border-strong);
+    color: var(--wb-text-soft);
+  }
+
+  .wb-btn-secondary:hover {
+    background: #151c24;
+    border-color: #4c5b69;
+    color: #ffffff;
+  }
+
+  /* Danger */
+  .wb-btn-danger {
+    background: var(--wb-surface);
+    border-color: #3f2a2d;
+    color: #fca5a5;
+  }
+
+  .wb-btn-danger:hover {
+    background: var(--wb-danger-soft);
+    border-color: var(--wb-danger);
+    color: var(--wb-danger-text);
+  }
+
+  /* Ghost */
+  .wb-btn-ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--wb-text-muted);
+  }
+
+  .wb-btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.04);
+    color: #ffffff;
+  }
+
+  .wb-actions {
+    @apply flex flex-wrap gap-3;
+  }
+
+  .wb-actions-grid {
+    @apply grid grid-cols-2 gap-3;
+  }
+}
+
+/* ============================= */
+/* Scroll */
+/* ============================= */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--wb-scroll-thumb) var(--wb-scroll-track);
+}
+
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--wb-scroll-track);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 4px;
+  background: var(--wb-scroll-thumb);
+  border-radius: 999px;
+  border: 2px solid var(--wb-scroll-track);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: var(--wb-scroll-thumb-hover);
 }
 
 /* ============================= */
-/* 텍스트 선택 스타일 */
+/* Selection */
 /* ============================= */
 
 ::selection {
-  background: #111827;
-  color: #ffffff;
+  background: var(--wb-selection-bg);
+  color: var(--wb-selection-text);
 }

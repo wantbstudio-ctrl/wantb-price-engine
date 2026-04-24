@@ -418,10 +418,10 @@ const fieldInputClass =
   "h-[44px] w-full rounded-2xl border border-[#3b4552] bg-[#0b1016] px-4 text-[14px] text-[#f3f7fb] outline-none placeholder:text-[#6f7b88] transition focus:border-[#22b7ff] focus:bg-[#0d131a] focus:shadow-[0_0_0_3px_rgba(34,183,255,0.10)]";
 
 const sectionTitleClass =
-  "text-[18px] font-bold tracking-[-0.02em] text-[#f7f8fb]";
+  "text-[18px] font-light tracking-tight text-[#38BDF8]";
 
 const sectionDescriptionClass =
-  "mt-2 text-[13px] leading-6 text-[#a6b0b9]";
+  "mt-1 text-xs leading-5 text-[#9aa4b2]";
 
 const primaryButtonClass =
   "inline-flex h-[42px] items-center justify-center rounded-2xl border border-[#22b7ff] bg-[#1aa7f7] px-4 text-[13px] font-semibold text-white transition hover:bg-[#2eb5ff] hover:shadow-[0_0_18px_rgba(34,183,255,0.18)]";
@@ -1828,9 +1828,9 @@ export default function EstimatePage() {
    <div className="mx-auto grid max-w-[2520px] grid-cols-1 gap-5 xl:grid-cols-[1180px_minmax(0,1fr)]">
         <div className="space-y-4">
           <div className="rounded-[30px] border border-[#26313b] bg-[linear-gradient(135deg,#1d2127_0%,#161b22_100%)] px-6 py-6 shadow-[0_20px_40px_rgba(0,0,0,0.34)] ring-1 ring-[rgba(255,255,255,0.02)]">
-            <h1 className="text-[30px] font-bold tracking-[-0.03em] text-[#f7f8fb]">
-              견적서
-            </h1>
+ <h1 className="text-[29px] font-light tracking-tight text-[#38BDF8]">
+  견적서
+</h1>
             <p className="mt-2 text-[13px] leading-6 text-[#a9b4bf]">
               거래명세서 기준의 문서형 미리보기를 유지하되, 좌측 입력 작업감은 기존 견적서처럼 넓고 편하게 구성한 화면
             </p>

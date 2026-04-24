@@ -36,13 +36,13 @@ function getAmountClass(value: number, options?: { emphasize?: boolean }) {
 
   if (value === 0) {
     return emphasize
-      ? "text-[22px] font-bold tracking-tight text-[#b6ada4]"
-      : "font-semibold text-[#b6ada4]";
+      ? "text-[22px] font-bold tracking-tight text-[#9aa6b2]"
+      : "font-semibold text-[#9aa6b2]";
   }
 
   return emphasize
-    ? "text-[22px] font-bold tracking-tight text-[#f7f8fb]"
-    : "font-semibold text-[#f7f8fb]";
+    ? "text-[22px] font-bold tracking-tight text-[#f8fafc]"
+    : "font-semibold text-[#f8fafc]";
 }
 
 function getPercentClass(value: number, options?: { emphasize?: boolean }) {
@@ -56,13 +56,38 @@ function getPercentClass(value: number, options?: { emphasize?: boolean }) {
 
   if (value === 0) {
     return emphasize
-      ? "text-[22px] font-bold tracking-tight text-[#b6ada4]"
-      : "font-semibold text-[#b6ada4]";
+      ? "text-[22px] font-bold tracking-tight text-[#9aa6b2]"
+      : "font-semibold text-[#9aa6b2]";
   }
 
   return emphasize
-    ? "text-[22px] font-bold tracking-tight text-[#f7f8fb]"
-    : "font-semibold text-[#f7f8fb]";
+    ? "text-[22px] font-bold tracking-tight text-[#f8fafc]"
+    : "font-semibold text-[#f8fafc]";
+}
+
+function cn(...classes: Array<string | false | null | undefined>) {
+  return classes.filter(Boolean).join(" ");
+}
+
+function getSelectionButtonClass(active: boolean, extra?: string) {
+  return cn(
+    "wb-btn flex items-center justify-center text-center",
+    active ? "wb-btn-primary" : "wb-btn-secondary",
+    extra
+  );
+}
+
+function getActionButtonClass(
+  variant: "primary" | "secondary" | "danger",
+  extra?: string
+) {
+  return cn(
+    "wb-btn flex items-center justify-center text-center",
+    variant === "primary" && "wb-btn-primary",
+    variant === "secondary" && "wb-btn-secondary",
+    variant === "danger" && "wb-btn-danger",
+    extra
+  );
 }
 
 type NumericInputProps = {
@@ -82,13 +107,13 @@ function SectionTitle({
   description?: string;
 }) {
   return (
-    <div className="mb-4 flex items-end justify-between gap-3 border-b border-[#433d36] pb-3">
+    <div className="mb-4 flex items-end justify-between gap-3 border-b border-[#2a3440] pb-3">
       <div>
-        <h3 className="text-base font-bold tracking-tight text-[#f7f8fb]">
-          {title}
-        </h3>
+        <h3 className="text-[18px] font-light tracking-tight text-[#38BDF8]">
+  {title}
+</h3>
         {description && (
-          <p className="mt-1 text-xs leading-5 text-[#9e968d]">{description}</p>
+          <p className="wb-subtitle mt-1 text-xs leading-5">{description}</p>
         )}
       </div>
     </div>
@@ -109,14 +134,14 @@ function ResultRow({
   return (
     <div
       className={`flex items-center justify-between gap-4 ${
-        divider ? "border-b border-[#3d3934] pb-3" : ""
+        divider ? "border-b border-[#26313d] pb-3" : ""
       }`}
     >
       <span
         className={
           emphasize
-            ? "text-sm font-semibold text-[#d8d1c8]"
-            : "text-sm text-[#a8a098]"
+            ? "text-sm font-semibold text-[#dbe7f3]"
+            : "text-sm text-[#9fb0c3]"
         }
       >
         {label}
@@ -138,8 +163,9 @@ function NumericInput({
 
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-[#ddd6cf]">{label}</label>
-      <div className="flex items-center rounded-2xl border border-[#514940] bg-[#121417] px-4 transition-all duration-200 hover:border-[#62584d] focus-within:border-[#22b7ff] focus-within:bg-[#14181c] focus-within:shadow-[0_0_0_1px_rgba(34,183,255,0.26),0_0_18px_rgba(34,183,255,0.10)]">
+      <label className="block text-sm font-medium text-[#dbe7f3]">{label}</label>
+
+      <div className="relative">
         <input
           type="text"
           inputMode="decimal"
@@ -172,10 +198,12 @@ function NumericInput({
             setText(String(normalized));
             onChange(normalized);
           }}
-          className="w-full bg-transparent py-3.5 text-[15px] font-medium text-[#f7f8fb] outline-none placeholder:text-[#7f756c]"
+          className={`w-full px-4 py-3.5 text-[15px] font-medium ${
+            suffix ? "pr-14" : ""
+          }`}
         />
         {suffix && (
-          <span className="pl-2 text-sm font-semibold text-[#a9c9d8]">
+          <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-[#8fd8ff]">
             {suffix}
           </span>
         )}
@@ -252,13 +280,16 @@ export default function PriceCalculator() {
 
     const onlinePlatformFee = Math.round(onlinePrice * normalizedPlatformRate);
     const onlineMiddleFee = calcMiddleFee(onlinePrice);
-    const onlineProfit = onlinePrice - totalCost - onlinePlatformFee - onlineMiddleFee;
+    const onlineProfit =
+      onlinePrice - totalCost - onlinePlatformFee - onlineMiddleFee;
     const onlineMarginRate =
       onlinePrice > 0
         ? safePercent(Math.round((onlineProfit / onlinePrice) * 1000) / 10)
         : 0;
 
-    const offlinePrice = Math.round(onlinePrice * (1 - normalizedOfflineDiscount));
+    const offlinePrice = Math.round(
+      onlinePrice * (1 - normalizedOfflineDiscount)
+    );
     const offlineMiddleFee = calcMiddleFee(offlinePrice);
     const offlineProfit = offlinePrice - totalCost - offlineMiddleFee;
     const offlineMarginRate =
@@ -275,7 +306,10 @@ export default function PriceCalculator() {
 
       if (distributorInputMode === "supplyPrice") {
         distributorSupplyPrice = Math.round(Number(distributorInputValue || 0));
-        distributorMarginAmount = Math.max(0, retailPrice - distributorSupplyPrice);
+        distributorMarginAmount = Math.max(
+          0,
+          retailPrice - distributorSupplyPrice
+        );
         distributorMarginRate =
           retailPrice > 0
             ? safePercent(
@@ -284,7 +318,10 @@ export default function PriceCalculator() {
             : 0;
       } else if (distributorInputMode === "marginAmount") {
         distributorMarginAmount = Math.round(Number(distributorInputValue || 0));
-        distributorSupplyPrice = Math.max(0, retailPrice - distributorMarginAmount);
+        distributorSupplyPrice = Math.max(
+          0,
+          retailPrice - distributorMarginAmount
+        );
         distributorMarginRate =
           retailPrice > 0
             ? safePercent(
@@ -296,7 +333,10 @@ export default function PriceCalculator() {
         distributorMarginAmount = Math.round(
           retailPrice * (distributorMarginRate / 100)
         );
-        distributorSupplyPrice = Math.max(0, retailPrice - distributorMarginAmount);
+        distributorSupplyPrice = Math.max(
+          0,
+          retailPrice - distributorMarginAmount
+        );
       }
     } else {
       const normalizedDistributionRate = Number(distributionDiscount || 0) / 100;
@@ -460,25 +500,24 @@ export default function PriceCalculator() {
   };
 
   return (
-    <div className="mx-auto grid min-h-[calc(100vh-32px)] max-w-[2520px] grid-cols-1 gap-5 xl:grid-cols-[1180px_minmax(0,1fr)]">
-      <div className="h-full rounded-[28px] border border-[#4d463e] bg-[#212325] p-6 shadow-[0_24px_50px_rgba(0,0,0,0.42)] ring-1 ring-[rgba(255,255,255,0.02)]">
-        <div className="mb-6 flex flex-col gap-3 border-b border-[#443d36] pb-5">
+    <div className="wb-page wb-page-2col">
+      <div className="wb-card h-full">
+        <div className="mb-6 flex flex-col gap-3 border-b border-[#2a3440] pb-5">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="inline-flex rounded-full border border-[#22b7ff]/40 bg-[#0d1a22] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#72dbff]">
+            <span className="inline-flex rounded-full border border-[#38bdf8]/40 bg-[#0b1822] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#7dd3fc]">
               Dashboard
             </span>
-            <span className="inline-flex rounded-full border border-[#4c453e] bg-[#191b1d] px-3 py-1 text-[11px] font-semibold tracking-[0.12em] text-[#b7afa6]">
+            <span className="inline-flex rounded-full border border-[#2b3642] bg-[#12171d] px-3 py-1 text-[11px] font-semibold tracking-[0.12em] text-[#b9c7d6]">
               Selling Price Calculator
             </span>
           </div>
 
           <div>
-            <h1 className="text-[30px] font-bold tracking-tight text-[#f7f8fb]">
-              판매가 계산기
-            </h1>
-            <p className="mt-2 text-sm leading-6 text-[#b0a79e]">
-              웜그레이 기반 다크톤 위에 핵심 값과 입력 영역이 또렷하게 보이도록
-              최종 마감한 계산 화면입니다.
+            <h1 className="text-[29px] font-light tracking-tight text-[#38BDF8]">
+  판매가 계산기
+</h1>
+            <p className="wb-subtitle mt-2">
+              다른 카테고리와 톤을 맞춘 쿨톤 다크 기준의 판매가 계산 화면입니다.
             </p>
           </div>
         </div>
@@ -490,16 +529,16 @@ export default function PriceCalculator() {
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-2 md:col-span-2">
-            <label className="block text-sm font-medium text-[#ddd6cf]">제품명</label>
-            <div className="rounded-2xl border border-[#514940] bg-[#121417] px-4 transition-all duration-200 hover:border-[#62584d] focus-within:border-[#22b7ff] focus-within:bg-[#14181c] focus-within:shadow-[0_0_0_1px_rgba(34,183,255,0.26),0_0_18px_rgba(34,183,255,0.10)]">
-              <input
-                type="text"
-                value={productName}
-                onChange={(e) => setProductName(e.target.value)}
-                className="w-full bg-transparent py-3.5 text-[15px] font-medium text-[#f7f8fb] outline-none placeholder:text-[#7f756c]"
-                placeholder="제품명을 입력하세요"
-              />
-            </div>
+            <label className="block text-sm font-medium text-[#dbe7f3]">
+              제품명
+            </label>
+            <input
+              type="text"
+              value={productName}
+              onChange={(e) => setProductName(e.target.value)}
+              className="w-full px-4 py-3.5 text-[15px] font-medium"
+              placeholder="제품명을 입력하세요"
+            />
           </div>
 
           <NumericInput
@@ -539,19 +578,18 @@ export default function PriceCalculator() {
             onChange={setPlatformFee}
           />
 
-          <div className="rounded-2xl border border-[#474038] bg-[#191c1f] p-4 md:col-span-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
-            <label className="mb-3 block text-sm font-medium text-[#ddd6cf]">
+          <div className="wb-panel md:col-span-2">
+            <label className="mb-3 block text-sm font-medium text-[#dbe7f3]">
               계산 기준
             </label>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               <button
                 type="button"
                 onClick={() => setCalculationMode("margin")}
-                className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
-                  calculationMode === "margin"
-                    ? "border-[#22b7ff] bg-[#101c24] text-[#f7f8fb] shadow-[0_0_20px_rgba(34,183,255,0.12)]"
-                    : "border-[#4e463f] bg-[#131518] text-[#d7d1c9] hover:border-[#22b7ff] hover:text-[#f7f8fb]"
-                }`}
+                className={getSelectionButtonClass(
+                  calculationMode === "margin",
+                  "w-full"
+                )}
               >
                 목표 마진 기준
               </button>
@@ -559,11 +597,10 @@ export default function PriceCalculator() {
               <button
                 type="button"
                 onClick={() => setCalculationMode("price")}
-                className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
-                  calculationMode === "price"
-                    ? "border-[#22b7ff] bg-[#101c24] text-[#f7f8fb] shadow-[0_0_20px_rgba(34,183,255,0.12)]"
-                    : "border-[#4e463f] bg-[#131518] text-[#d7d1c9] hover:border-[#22b7ff] hover:text-[#f7f8fb]"
-                }`}
+                className={getSelectionButtonClass(
+                  calculationMode === "price",
+                  "w-full"
+                )}
               >
                 판매가 기준
               </button>
@@ -571,11 +608,10 @@ export default function PriceCalculator() {
               <button
                 type="button"
                 onClick={() => setCalculationMode("distributor")}
-                className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
-                  calculationMode === "distributor"
-                    ? "border-[#79e8ff] bg-[#122028] text-[#f7f8fb] shadow-[0_0_20px_rgba(121,232,255,0.10)]"
-                    : "border-[#4e463f] bg-[#131518] text-[#d7d1c9] hover:border-[#79e8ff] hover:text-[#f7f8fb]"
-                }`}
+                className={getSelectionButtonClass(
+                  calculationMode === "distributor",
+                  "w-full"
+                )}
               >
                 제조사-유통 기준
               </button>
@@ -630,19 +666,18 @@ export default function PriceCalculator() {
                 onChange={setTargetSalePrice}
               />
 
-              <div className="rounded-2xl border border-[#474038] bg-[#191c1f] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
-                <label className="mb-3 block text-sm font-medium text-[#ddd6cf]">
+              <div className="wb-panel">
+                <label className="mb-3 block text-sm font-medium text-[#dbe7f3]">
                   유통 계산 기준
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => setDistributorInputMode("supplyPrice")}
-                    className={`rounded-xl border px-3 py-3 text-sm font-semibold transition ${
-                      distributorInputMode === "supplyPrice"
-                        ? "border-[#22b7ff] bg-[#101c24] text-[#f7f8fb]"
-                        : "border-[#4e463f] bg-[#131518] text-[#d7d1c9] hover:border-[#22b7ff] hover:text-[#f7f8fb]"
-                    }`}
+                    className={getSelectionButtonClass(
+                      distributorInputMode === "supplyPrice",
+                      "w-full px-3"
+                    )}
                   >
                     납품가 기준
                   </button>
@@ -650,11 +685,10 @@ export default function PriceCalculator() {
                   <button
                     type="button"
                     onClick={() => setDistributorInputMode("marginAmount")}
-                    className={`rounded-xl border px-3 py-3 text-sm font-semibold transition ${
-                      distributorInputMode === "marginAmount"
-                        ? "border-[#22b7ff] bg-[#101c24] text-[#f7f8fb]"
-                        : "border-[#4e463f] bg-[#131518] text-[#d7d1c9] hover:border-[#22b7ff] hover:text-[#f7f8fb]"
-                    }`}
+                    className={getSelectionButtonClass(
+                      distributorInputMode === "marginAmount",
+                      "w-full px-3"
+                    )}
                   >
                     마진금액 기준
                   </button>
@@ -662,11 +696,10 @@ export default function PriceCalculator() {
                   <button
                     type="button"
                     onClick={() => setDistributorInputMode("marginRate")}
-                    className={`rounded-xl border px-3 py-3 text-sm font-semibold transition ${
-                      distributorInputMode === "marginRate"
-                        ? "border-[#79e8ff] bg-[#122028] text-[#f7f8fb]"
-                        : "border-[#4e463f] bg-[#131518] text-[#d7d1c9] hover:border-[#79e8ff] hover:text-[#f7f8fb]"
-                    }`}
+                    className={getSelectionButtonClass(
+                      distributorInputMode === "marginRate",
+                      "w-full px-3"
+                    )}
                   >
                     마진율 기준
                   </button>
@@ -688,10 +721,11 @@ export default function PriceCalculator() {
           )}
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-[#ddd6cf]">
+            <label className="block text-sm font-medium text-[#dbe7f3]">
               중간판매 수수료
             </label>
-            <div className="flex overflow-hidden rounded-2xl border border-[#514940] bg-[#121417] transition-all duration-200 hover:border-[#62584d] focus-within:border-[#22b7ff] focus-within:bg-[#14181c] focus-within:shadow-[0_0_0_1px_rgba(34,183,255,0.26),0_0_18px_rgba(34,183,255,0.10)]">
+
+            <div className="flex overflow-hidden rounded-2xl border border-[#33404d] bg-[#1b2128] transition-all duration-200 hover:border-[#3b4654] focus-within:border-[#60a5fa] focus-within:bg-[#242c35] focus-within:shadow-[0_0_0_3px_rgba(96,165,250,0.2)]">
               <input
                 type="text"
                 inputMode="decimal"
@@ -706,7 +740,10 @@ export default function PriceCalculator() {
                   );
                 }}
                 onBlur={(e) => {
-                  if (e.target.value === "" || Number.isNaN(Number(e.target.value))) {
+                  if (
+                    e.target.value === "" ||
+                    Number.isNaN(Number(e.target.value))
+                  ) {
                     setMiddleFeeValue(0);
                     e.target.value = "0";
                     return;
@@ -715,29 +752,31 @@ export default function PriceCalculator() {
                   setMiddleFeeValue(normalized);
                   e.target.value = String(normalized);
                 }}
-                className="w-full bg-transparent px-4 py-3.5 text-[15px] font-medium text-[#f7f8fb] outline-none placeholder:text-[#7f756c]"
+                className="w-full rounded-none border-0 bg-transparent px-4 py-3.5 text-[15px] font-medium text-[#f8fafc] outline-none shadow-none focus:border-0 focus:shadow-none hover:bg-transparent"
               />
 
-              <div className="flex border-l border-[#514940]">
+              <div className="flex border-l border-[#33404d]">
                 <button
                   type="button"
                   onClick={() => setMiddleFeeType("percent")}
-                  className={`min-w-[60px] px-3 text-sm font-semibold transition ${
+                  className={cn(
+                    "min-w-[60px] border-0 px-3 text-sm font-semibold transition",
                     middleFeeType === "percent"
-                      ? "bg-[#101c24] text-[#f7f8fb]"
-                      : "bg-[#1a1c20] text-[#d7d1c9]"
-                  }`}
+                      ? "bg-[#0d1a24] text-[#f8fafc]"
+                      : "bg-[#1a2129] text-[#d9e4ef]"
+                  )}
                 >
                   %
                 </button>
                 <button
                   type="button"
                   onClick={() => setMiddleFeeType("fixed")}
-                  className={`min-w-[60px] border-l border-[#514940] px-3 text-sm font-semibold transition ${
+                  className={cn(
+                    "min-w-[60px] border-l border-[#33404d] px-3 text-sm font-semibold transition",
                     middleFeeType === "fixed"
-                      ? "bg-[#22b7ff] text-[#f7f8fb]"
-                      : "bg-[#1a1c20] text-[#d7d1c9]"
-                  }`}
+                      ? "bg-[#0d1a24] text-[#f8fafc]"
+                      : "bg-[#1a2129] text-[#d9e4ef]"
+                  )}
                 >
                   원
                 </button>
@@ -746,19 +785,18 @@ export default function PriceCalculator() {
           </div>
         </div>
 
-        <div className="mt-7 rounded-2xl border border-[#474038] bg-[#191c1f] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
-          <label className="mb-3 block text-sm font-medium text-[#ddd6cf]">
+        <div className="wb-panel mt-7">
+          <label className="mb-3 block text-sm font-medium text-[#dbe7f3]">
             채널 선택
           </label>
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
               onClick={() => handleToggleChannel("online")}
-              className={`rounded-2xl border px-5 py-3 text-sm font-semibold transition ${
-                selectedChannels.includes("online")
-                  ? "border-[#22b7ff] bg-[#101c24] text-[#f7f8fb] shadow-[0_0_18px_rgba(34,183,255,0.10)]"
-                  : "border-[#4e463f] bg-[#131518] text-[#d7d1c9] hover:border-[#22b7ff] hover:text-[#f7f8fb]"
-              }`}
+              className={getSelectionButtonClass(
+                selectedChannels.includes("online"),
+                "px-5"
+              )}
             >
               온라인
             </button>
@@ -766,11 +804,10 @@ export default function PriceCalculator() {
             <button
               type="button"
               onClick={() => handleToggleChannel("offline")}
-              className={`rounded-2xl border px-5 py-3 text-sm font-semibold transition ${
-                selectedChannels.includes("offline")
-                  ? "border-[#22b7ff] bg-[#101c24] text-[#f7f8fb] shadow-[0_0_18px_rgba(34,183,255,0.10)]"
-                  : "border-[#4e463f] bg-[#131518] text-[#d7d1c9] hover:border-[#22b7ff] hover:text-[#f7f8fb]"
-              }`}
+              className={getSelectionButtonClass(
+                selectedChannels.includes("offline"),
+                "px-5"
+              )}
             >
               오프라인
             </button>
@@ -778,22 +815,21 @@ export default function PriceCalculator() {
             <button
               type="button"
               onClick={() => handleToggleChannel("distribution")}
-              className={`rounded-2xl border px-5 py-3 text-sm font-semibold transition ${
-                selectedChannels.includes("distribution")
-                  ? "border-[#79e8ff] bg-[#122028] text-[#f7f8fb] shadow-[0_0_18px_rgba(121,232,255,0.08)]"
-                  : "border-[#4e463f] bg-[#131518] text-[#d7d1c9] hover:border-[#79e8ff] hover:text-[#f7f8fb]"
-              }`}
+              className={getSelectionButtonClass(
+                selectedChannels.includes("distribution"),
+                "px-5"
+              )}
             >
               유통
             </button>
           </div>
         </div>
 
-        <div className="mt-8 flex flex-wrap gap-3">
+        <div className="wb-actions mt-8">
           <button
             type="button"
             onClick={handleCreateEstimate}
-            className="rounded-2xl border border-[#22b7ff] bg-[#1aa7f7] px-5 py-3 text-sm font-bold text-[#f7f8fb] transition hover:bg-[#2eb5ff] hover:shadow-[0_0_18px_rgba(34,183,255,0.22)]"
+            className={getActionButtonClass("primary", "px-5")}
           >
             견적 만들기
           </button>
@@ -801,37 +837,37 @@ export default function PriceCalculator() {
           <button
             type="button"
             onClick={handleReset}
-            className="rounded-2xl border border-[#575046] bg-[#16181b] px-5 py-3 text-sm font-semibold text-[#ddd6cf] transition hover:border-red-400 hover:bg-[#201617] hover:text-red-300"
+            className={getActionButtonClass("danger", "px-5")}
           >
             초기화
           </button>
         </div>
       </div>
 
-      <div className="h-full rounded-[28px] border border-[#4d463e] bg-[#212325] p-6 shadow-[0_24px_50px_rgba(0,0,0,0.42)] ring-1 ring-[rgba(255,255,255,0.02)]">
-        <div className="mb-6 flex items-center justify-between gap-3 border-b border-[#443d36] pb-5">
+      <div className="wb-card h-full">
+        <div className="mb-6 flex items-center justify-between gap-3 border-b border-[#2a3440] pb-5">
           <div>
-            <h2 className="text-[30px] font-bold tracking-tight text-[#f7f8fb]">
-              자동 계산 결과
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-[#b0a79e]">
-              핵심 금액과 채널별 수익 구조를 한눈에 확인할 수 있도록 마지막으로
-              정리한 요약 패널입니다.
+            <h2 className="text-[29px] font-semibold tracking-tight text-white">
+  자동 계산 결과
+</h2>
+            <p className="wb-subtitle mt-2">
+              핵심 금액과 채널별 수익 구조를 한눈에 확인할 수 있도록 정리한
+              결과 패널입니다.
             </p>
           </div>
-          <span className="rounded-full border border-[#4d463e] bg-[#181a1d] px-3 py-1 text-xs font-semibold text-[#b7afa6]">
+          <span className="rounded-full border border-[#2b3642] bg-[#12171d] px-3 py-1 text-xs font-semibold text-[#b9c7d6]">
             Live Summary
           </span>
         </div>
 
         {calculationMode === "distributor" ? (
           <>
-            <div className="rounded-[24px] border border-[#4f4740] bg-[#181c20] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+            <div className="rounded-[24px] border border-[#25313d] bg-[#11171d] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
               <div className="mb-4 flex items-center justify-between gap-3">
-                <h3 className="text-lg font-bold tracking-tight text-[#f7f8fb]">
+                <h3 className="text-lg font-bold tracking-tight text-[#f8fafc]">
                   제조사-유통 계산 요약
                 </h3>
-                <span className="rounded-full border border-[#79e8ff]/50 bg-[#0e1c24] px-3 py-1 text-xs font-bold text-[#86ebff]">
+                <span className="rounded-full border border-[#67e8f9]/50 bg-[#0d1a22] px-3 py-1 text-xs font-bold text-[#8be9ff]">
                   제조사 기준
                 </span>
               </div>
@@ -841,7 +877,11 @@ export default function PriceCalculator() {
                   label="소비자가"
                   divider
                   value={
-                    <span className={getAmountClass(targetSalePrice, { emphasize: true })}>
+                    <span
+                      className={getAmountClass(targetSalePrice, {
+                        emphasize: true,
+                      })}
+                    >
                       {numberFormat(targetSalePrice)}원
                     </span>
                   }
@@ -852,9 +892,12 @@ export default function PriceCalculator() {
                   emphasize
                   value={
                     <span
-                      className={getAmountClass(calculations.distributorSupplyPrice, {
-                        emphasize: true,
-                      })}
+                      className={getAmountClass(
+                        calculations.distributorSupplyPrice,
+                        {
+                          emphasize: true,
+                        }
+                      )}
                     >
                       {numberFormat(calculations.distributorSupplyPrice)}원
                     </span>
@@ -864,7 +907,11 @@ export default function PriceCalculator() {
                 <ResultRow
                   label="유통사 마진금액"
                   value={
-                    <span className={getAmountClass(calculations.distributorMarginAmount)}>
+                    <span
+                      className={getAmountClass(
+                        calculations.distributorMarginAmount
+                      )}
+                    >
                       {numberFormat(calculations.distributorMarginAmount)}원
                     </span>
                   }
@@ -873,13 +920,17 @@ export default function PriceCalculator() {
                 <ResultRow
                   label="유통사 마진율"
                   value={
-                    <span className={getPercentClass(calculations.distributorMarginRate)}>
+                    <span
+                      className={getPercentClass(
+                        calculations.distributorMarginRate
+                      )}
+                    >
                       {formatPercent(calculations.distributorMarginRate)}
                     </span>
                   }
                 />
 
-                <div className="my-2 border-t border-[#3d3934]" />
+                <div className="my-2 border-t border-[#26313d]" />
 
                 <ResultRow
                   label="총원가"
@@ -900,7 +951,10 @@ export default function PriceCalculator() {
                         { emphasize: true }
                       )}
                     >
-                      {numberFormat(calculations.manufacturerProfitAtDistribution)}원
+                      {numberFormat(
+                        calculations.manufacturerProfitAtDistribution
+                      )}
+                      원
                     </span>
                   }
                 />
@@ -913,7 +967,9 @@ export default function PriceCalculator() {
                         calculations.manufacturerProfitRateAtDistribution
                       )}
                     >
-                      {formatPercent(calculations.manufacturerProfitRateAtDistribution)}
+                      {formatPercent(
+                        calculations.manufacturerProfitRateAtDistribution
+                      )}
                     </span>
                   }
                 />
@@ -926,21 +982,23 @@ export default function PriceCalculator() {
                         calculations.manufacturerProfitRateAgainstCost
                       )}
                     >
-                      {formatPercent(calculations.manufacturerProfitRateAgainstCost)}
+                      {formatPercent(
+                        calculations.manufacturerProfitRateAgainstCost
+                      )}
                     </span>
                   }
                 />
               </div>
             </div>
 
-            <div className="mt-4 rounded-[24px] border border-[#484139] bg-[#171a1d] p-4">
+            <div className="mt-4 rounded-[24px] border border-[#25313d] bg-[#11171d] p-4">
               <div className="flex items-center justify-between py-1 text-sm">
-                <span className="text-[#a8a098]">현재 계산 기준</span>
-                <span className="font-bold text-[#f7f8fb]">제조사-유통 기준</span>
+                <span className="text-[#9fb0c3]">현재 계산 기준</span>
+                <span className="font-bold text-[#f8fafc]">제조사-유통 기준</span>
               </div>
               <div className="mt-2 flex items-center justify-between py-1 text-sm">
-                <span className="text-[#a8a098]">유통 계산 기준</span>
-                <span className="font-bold text-[#f7f8fb]">
+                <span className="text-[#9fb0c3]">유통 계산 기준</span>
+                <span className="font-bold text-[#f8fafc]">
                   {distributorInputMode === "supplyPrice"
                     ? "납품가 기준"
                     : distributorInputMode === "marginAmount"
@@ -951,17 +1009,17 @@ export default function PriceCalculator() {
             </div>
           </>
         ) : (
-          <div className="rounded-[24px] border border-[#484139] bg-[#171a1d] p-4">
+          <div className="rounded-[24px] border border-[#25313d] bg-[#11171d] p-4">
             <div className="flex items-center justify-between py-1 text-sm">
-              <span className="text-[#a8a098]">현재 계산 기준</span>
-              <span className="font-bold text-[#f7f8fb]">
+              <span className="text-[#9fb0c3]">현재 계산 기준</span>
+              <span className="font-bold text-[#f8fafc]">
                 {calculationMode === "margin" ? "목표 마진 기준" : "판매가 기준"}
               </span>
             </div>
 
             {calculationMode === "margin" && (
               <div className="mt-2 flex items-center justify-between py-1 text-sm">
-                <span className="text-[#a8a098]">설정 목표 마진</span>
+                <span className="text-[#9fb0c3]">설정 목표 마진</span>
                 <span className={getPercentClass(marginRate)}>
                   {formatPercent(marginRate)}
                 </span>
@@ -971,14 +1029,18 @@ export default function PriceCalculator() {
             {calculationMode === "price" && (
               <>
                 <div className="mt-2 flex items-center justify-between py-1 text-sm">
-                  <span className="text-[#a8a098]">입력 판매가</span>
+                  <span className="text-[#9fb0c3]">입력 판매가</span>
                   <span className={getAmountClass(targetSalePrice)}>
                     {numberFormat(targetSalePrice)}원
                   </span>
                 </div>
                 <div className="mt-2 flex items-center justify-between py-1 text-sm">
-                  <span className="text-[#a8a098]">역산 마진율</span>
-                  <span className={getPercentClass(calculations.impliedOnlineMarginRate)}>
+                  <span className="text-[#9fb0c3]">역산 마진율</span>
+                  <span
+                    className={getPercentClass(
+                      calculations.impliedOnlineMarginRate
+                    )}
+                  >
                     {formatPercent(calculations.impliedOnlineMarginRate)}
                   </span>
                 </div>
@@ -988,8 +1050,8 @@ export default function PriceCalculator() {
         )}
 
         <div className="mt-6 space-y-4">
-          <div className="rounded-[24px] border border-[#4f4740] bg-[#181c20] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-            <h3 className="mb-3 text-base font-bold text-[#f7f8fb]">원가 요약</h3>
+          <div className="rounded-[24px] border border-[#25313d] bg-[#11171d] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+            <h3 className="mb-3 text-base font-bold text-[#f8fafc]">원가 요약</h3>
             <div className="space-y-3">
               <ResultRow
                 label="기본 원가 합계"
@@ -1011,7 +1073,11 @@ export default function PriceCalculator() {
                 label="총 원가"
                 emphasize
                 value={
-                  <span className={getAmountClass(calculations.totalCost, { emphasize: true })}>
+                  <span
+                    className={getAmountClass(calculations.totalCost, {
+                      emphasize: true,
+                    })}
+                  >
                     {numberFormat(calculations.totalCost)}원
                   </span>
                 }
@@ -1020,10 +1086,10 @@ export default function PriceCalculator() {
           </div>
 
           {selectedChannels.includes("online") && (
-            <div className="rounded-[24px] border border-[#4f4740] bg-[#181c20] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+            <div className="rounded-[24px] border border-[#25313d] bg-[#11171d] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
               <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-base font-bold text-[#f7f8fb]">온라인</h3>
-                <span className="rounded-full border border-[#22b7ff]/40 bg-[#0f1b22] px-3 py-1 text-[11px] font-bold text-[#70d9ff]">
+                <h3 className="text-base font-bold text-[#f8fafc]">온라인</h3>
+                <span className="rounded-full border border-[#38bdf8]/40 bg-[#0c1720] px-3 py-1 text-[11px] font-bold text-[#7dd3fc]">
                   Online
                 </span>
               </div>
@@ -1032,7 +1098,11 @@ export default function PriceCalculator() {
                   label="판매가"
                   emphasize
                   value={
-                    <span className={getAmountClass(calculations.online.price, { emphasize: true })}>
+                    <span
+                      className={getAmountClass(calculations.online.price, {
+                        emphasize: true,
+                      })}
+                    >
                       {numberFormat(calculations.online.price)}원
                     </span>
                   }
@@ -1040,7 +1110,11 @@ export default function PriceCalculator() {
                 <ResultRow
                   label="플랫폼 수수료"
                   value={
-                    <span className={getAmountClass(calculations.online.platformFee)}>
+                    <span
+                      className={getAmountClass(
+                        calculations.online.platformFee
+                      )}
+                    >
                       {numberFormat(calculations.online.platformFee)}원
                     </span>
                   }
@@ -1048,7 +1122,9 @@ export default function PriceCalculator() {
                 <ResultRow
                   label="중간판매 수수료"
                   value={
-                    <span className={getAmountClass(calculations.online.middleFee)}>
+                    <span
+                      className={getAmountClass(calculations.online.middleFee)}
+                    >
                       {numberFormat(calculations.online.middleFee)}원
                     </span>
                   }
@@ -1064,7 +1140,9 @@ export default function PriceCalculator() {
                 <ResultRow
                   label="수익률"
                   value={
-                    <span className={getPercentClass(calculations.online.marginRate)}>
+                    <span
+                      className={getPercentClass(calculations.online.marginRate)}
+                    >
                       {formatPercent(calculations.online.marginRate)}
                     </span>
                   }
@@ -1074,10 +1152,10 @@ export default function PriceCalculator() {
           )}
 
           {selectedChannels.includes("offline") && (
-            <div className="rounded-[24px] border border-[#4f4740] bg-[#181c20] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+            <div className="rounded-[24px] border border-[#25313d] bg-[#11171d] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
               <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-base font-bold text-[#f7f8fb]">오프라인</h3>
-                <span className="rounded-full border border-[#22b7ff]/30 bg-[#10161b] px-3 py-1 text-[11px] font-bold text-[#b5dfff]">
+                <h3 className="text-base font-bold text-[#f8fafc]">오프라인</h3>
+                <span className="rounded-full border border-[#38bdf8]/28 bg-[#0d141b] px-3 py-1 text-[11px] font-bold text-[#c8e8ff]">
                   Offline
                 </span>
               </div>
@@ -1086,7 +1164,11 @@ export default function PriceCalculator() {
                   label="납품가"
                   emphasize
                   value={
-                    <span className={getAmountClass(calculations.offline.price, { emphasize: true })}>
+                    <span
+                      className={getAmountClass(calculations.offline.price, {
+                        emphasize: true,
+                      })}
+                    >
                       {numberFormat(calculations.offline.price)}원
                     </span>
                   }
@@ -1094,7 +1176,9 @@ export default function PriceCalculator() {
                 <ResultRow
                   label="중간판매 수수료"
                   value={
-                    <span className={getAmountClass(calculations.offline.middleFee)}>
+                    <span
+                      className={getAmountClass(calculations.offline.middleFee)}
+                    >
                       {numberFormat(calculations.offline.middleFee)}원
                     </span>
                   }
@@ -1110,7 +1194,11 @@ export default function PriceCalculator() {
                 <ResultRow
                   label="수익률"
                   value={
-                    <span className={getPercentClass(calculations.offline.marginRate)}>
+                    <span
+                      className={getPercentClass(
+                        calculations.offline.marginRate
+                      )}
+                    >
                       {formatPercent(calculations.offline.marginRate)}
                     </span>
                   }
@@ -1120,10 +1208,10 @@ export default function PriceCalculator() {
           )}
 
           {selectedChannels.includes("distribution") && (
-            <div className="rounded-[24px] border border-[#4f4740] bg-[#181c20] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+            <div className="rounded-[24px] border border-[#25313d] bg-[#11171d] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
               <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-base font-bold text-[#f7f8fb]">유통</h3>
-                <span className="rounded-full border border-[#79e8ff]/40 bg-[#122027] px-3 py-1 text-[11px] font-bold text-[#8be9ff]">
+                <h3 className="text-base font-bold text-[#f8fafc]">유통</h3>
+                <span className="rounded-full border border-[#67e8f9]/40 bg-[#0d1a21] px-3 py-1 text-[11px] font-bold text-[#8be9ff]">
                   Distribution
                 </span>
               </div>
@@ -1144,7 +1232,11 @@ export default function PriceCalculator() {
                 <ResultRow
                   label="유통사 마진금액"
                   value={
-                    <span className={getAmountClass(calculations.distributorMarginAmount)}>
+                    <span
+                      className={getAmountClass(
+                        calculations.distributorMarginAmount
+                      )}
+                    >
                       {numberFormat(calculations.distributorMarginAmount)}원
                     </span>
                   }
@@ -1152,7 +1244,11 @@ export default function PriceCalculator() {
                 <ResultRow
                   label="유통사 마진율"
                   value={
-                    <span className={getPercentClass(calculations.distributorMarginRate)}>
+                    <span
+                      className={getPercentClass(
+                        calculations.distributorMarginRate
+                      )}
+                    >
                       {formatPercent(calculations.distributorMarginRate)}
                     </span>
                   }
@@ -1160,7 +1256,11 @@ export default function PriceCalculator() {
                 <ResultRow
                   label="중간판매 수수료"
                   value={
-                    <span className={getAmountClass(calculations.distribution.middleFee)}>
+                    <span
+                      className={getAmountClass(
+                        calculations.distribution.middleFee
+                      )}
+                    >
                       {numberFormat(calculations.distribution.middleFee)}원
                     </span>
                   }
@@ -1168,7 +1268,9 @@ export default function PriceCalculator() {
                 <ResultRow
                   label="제조사 수익"
                   value={
-                    <span className={getAmountClass(calculations.distribution.profit)}>
+                    <span
+                      className={getAmountClass(calculations.distribution.profit)}
+                    >
                       {numberFormat(calculations.distribution.profit)}원
                     </span>
                   }
@@ -1176,7 +1278,11 @@ export default function PriceCalculator() {
                 <ResultRow
                   label="제조사 수익률"
                   value={
-                    <span className={getPercentClass(calculations.distribution.marginRate)}>
+                    <span
+                      className={getPercentClass(
+                        calculations.distribution.marginRate
+                      )}
+                    >
                       {formatPercent(calculations.distribution.marginRate)}
                     </span>
                   }

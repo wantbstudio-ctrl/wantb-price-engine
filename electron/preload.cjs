@@ -21,4 +21,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   openHometaxDirect: () =>
     ipcRenderer.invoke("open-hometax-direct"),
+
+  openUrlWithChrome: (url) =>
+    ipcRenderer.invoke("open-url-with-chrome", url),
 });
