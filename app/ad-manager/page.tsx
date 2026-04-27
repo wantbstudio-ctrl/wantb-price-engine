@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { memo, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+
 
 type DayValue = "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
 type TargetPage =
@@ -237,7 +239,7 @@ async function apiPost(action: string, payload: Record<string, any>) {
   return data;
 }
 
-function AdPreview({ form }: { form: AdForm }) {
+const AdPreview = memo(function AdPreview({ form }: { form: AdForm }) {
   return (
     <div className="overflow-hidden rounded-3xl border border-white/10 bg-[#10151d] shadow-[0_18px_60px_rgba(0,0,0,0.35)]">
       <div className="border-b border-white/10 px-5 py-4">
@@ -360,10 +362,39 @@ function AdPreview({ form }: { form: AdForm }) {
       </div>
     </div>
   );
-}
+});
 
 export default function AdManagerPage() {
+  const router = useRouter();
+  const [authChecking, setAuthChecking] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    async function checkAuth() {
+      try {
+        const api = (window as any).electronAPI;
+        const status = await api?.getLicenseStatus?.();
+        const ok = status?.role === "admin" || status?.isAdmin === true;
+        if (!ok) {
+          router.replace("/");
+          return;
+        }
+      } catch {
+        router.replace("/");
+        return;
+      } finally {
+        if (mounted) setAuthChecking(false);
+      }
+    }
+    checkAuth();
+    return () => { mounted = false; };
+  }, [router]);
+
+  if (authChecking) {
+    return <div className="rounded-3xl border border-white/10 bg-[#121821] p-10 text-sm text-slate-300">권한 확인 중입니다...</div>;
+  }
   const [ads, setAds] = useState<AdItem[]>([]);
+  const deferredAds = useDeferredValue(ads);
   const [form, setForm] = useState<AdForm>(createEmptyForm());
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -373,7 +404,7 @@ export default function AdManagerPage() {
 
   const filteredAds = useMemo(() => {
     const q = keyword.trim().toLowerCase();
-    if (!q) return ads;
+    if (!q) return deferredAds;
 
     return ads.filter((ad) => {
       return [
@@ -388,7 +419,7 @@ export default function AdManagerPage() {
         .toLowerCase()
         .includes(q);
     });
-  }, [ads, keyword]);
+  }, [deferredAds, keyword]);
 
   const loadAds = async () => {
     try {
@@ -1045,7 +1076,7 @@ export default function AdManagerPage() {
           </div>
         </div>
 
-        <AdPreview form={form} />
+        <AdPreview form={useDeferredValue(form)} />
       </div>
     </div>
   );

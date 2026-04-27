@@ -31,15 +31,18 @@ export default function LicensePage() {
         }
 
         if (window.electronAPI?.getLicenseStatus) {
-const licenseStatus = await window.electronAPI.getLicenseStatus();
+          const licenseStatus = await window.electronAPI.getLicenseStatus();
 
-if (!mounted) return;
+          if (!mounted) return;
 
-if (licenseStatus?.status === "ACTIVE") {
-  localStorage.setItem("wantb-license", "ACTIVE");
-  router.replace("/");
-  return;
-}
+          if (
+            licenseStatus?.status === "ACTIVE" ||
+            licenseStatus?.activated === true
+          ) {
+            localStorage.setItem("wantb-license", "ACTIVE");
+            router.replace("/");
+            return;
+          }
         }
 
         if (window.electronAPI?.getHardwareId) {
@@ -87,12 +90,12 @@ if (licenseStatus?.status === "ACTIVE") {
       );
 
       if (result?.success) {
-  localStorage.setItem("wantb-license", "ACTIVE");
-  setMessage("인증 완료. 잠시 후 이동합니다.");
-  router.replace("/");
-} else {
-  setMessage("라이센스 인증에 실패했습니다.");
-}
+        localStorage.setItem("wantb-license", "ACTIVE");
+        setMessage("인증 완료. 잠시 후 이동합니다.");
+        router.replace("/");
+      } else {
+        setMessage(result?.message || "라이센스 인증에 실패했습니다.");
+      }
     } catch (error) {
       console.error("License activate error:", error);
       setMessage("라이센스 인증 중 오류가 발생했습니다.");
@@ -101,9 +104,7 @@ if (licenseStatus?.status === "ACTIVE") {
     }
   };
 
-  const handleKeyDown = async (
-    e: React.KeyboardEvent<HTMLInputElement>
-  ) => {
+  const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
       await handleActivate();
@@ -113,7 +114,7 @@ if (licenseStatus?.status === "ACTIVE") {
   if (loading) {
     return (
       <div
-        className="flex min-h-screen items-center justify-center bg-gray-100"
+        className="flex min-h-screen items-center justify-center bg-[#f3f4f6]"
         style={noDragStyle}
       >
         <div
@@ -131,7 +132,7 @@ if (licenseStatus?.status === "ACTIVE") {
 
   return (
     <div
-      className="flex min-h-screen items-center justify-center bg-gray-100 px-4"
+      className="flex min-h-screen items-center justify-center bg-[#f3f4f6] px-4"
       style={noDragStyle}
     >
       <div
@@ -153,8 +154,13 @@ if (licenseStatus?.status === "ACTIVE") {
             type="text"
             value={hardwareId}
             readOnly
-            className="w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-700 outline-none"
-            style={noDragStyle}
+            className="w-full rounded-lg border border-[#1f2937] bg-[#050b12] px-4 py-3 text-sm font-medium text-white placeholder:text-white/50 outline-none"
+            style={{
+              ...noDragStyle,
+              color: "#ffffff",
+              WebkitTextFillColor: "#ffffff",
+              caretColor: "#ffffff",
+            }}
           />
         </div>
 
@@ -165,17 +171,22 @@ if (licenseStatus?.status === "ACTIVE") {
           <input
             type="text"
             value={licenseCode}
-            onChange={(e) => setLicenseCode(e.target.value)}
+            onChange={(e) => setLicenseCode(e.target.value.toUpperCase())}
             onKeyDown={handleKeyDown}
-            placeholder="예: WW12345A"
+            placeholder="예: WW10013A"
             autoFocus
-            className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none focus:border-gray-900"
-            style={noDragStyle}
+            className="w-full rounded-lg border border-[#1f2937] bg-[#050b12] px-4 py-3 text-sm font-semibold tracking-wide text-white placeholder:text-white/45 outline-none transition focus:border-[#38BDF8] focus:ring-2 focus:ring-[#38BDF8]/20"
+            style={{
+              ...noDragStyle,
+              color: "#ffffff",
+              WebkitTextFillColor: "#ffffff",
+              caretColor: "#ffffff",
+            }}
           />
         </div>
 
         {message ? (
-          <div className="mb-4 rounded-lg bg-gray-50 px-4 py-3 text-sm text-gray-700">
+          <div className="mb-4 rounded-lg border border-[#d1d5db] bg-[#f9fafb] px-4 py-3 text-sm font-medium text-gray-800">
             {message}
           </div>
         ) : null}

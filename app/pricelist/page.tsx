@@ -3,6 +3,9 @@
 import {
   ChangeEvent,
   KeyboardEvent,
+  memo,
+  useCallback,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -70,8 +73,8 @@ const CURRENT_NUMBER_KEY = "wantb-current-price-list-number";
 const COMPANY_KEY = "wantb-company-settings";
 const PRODUCT_LIBRARY_KEY = "wantb-product-library";
 
-const ITEMS_PER_FIRST_PAGE = 12;
-const ITEMS_PER_NEXT_PAGE = 12;
+const ITEMS_PER_FIRST_PAGE = 13;
+const ITEMS_PER_NEXT_PAGE = 13;
 
 const EDITABLE_COLUMNS: EditableColumn[] = [
   "name",
@@ -167,7 +170,7 @@ function productToPriceItem(product: ProductLibraryItem): PriceItem {
   };
 }
 
-function ImagePlaceholder() {
+const ImagePlaceholder = memo(function ImagePlaceholder() {
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-[#8ca0b3]">
       <svg
@@ -186,7 +189,7 @@ function ImagePlaceholder() {
       <span className="text-[10px] font-medium leading-none">이미지</span>
     </div>
   );
-}
+});
 
 export default function PriceListPage() {
   const previewRef = useRef<HTMLDivElement | null>(null);
@@ -211,9 +214,12 @@ export default function PriceListPage() {
     createEmptyItem(),
   ]);
 
+  const deferredItems = useDeferredValue(items);
+
   const [productLibrary, setProductLibrary] = useState<ProductLibraryItem[]>([]);
   const [selectedProductId, setSelectedProductId] = useState("");
   const [productKeyword, setProductKeyword] = useState("");
+  const deferredProductKeyword = useDeferredValue(productKeyword);
 
   useEffect(() => {
     const companyRaw = localStorage.getItem(COMPANY_KEY);
@@ -242,7 +248,7 @@ export default function PriceListPage() {
   }, []);
 
   const filteredProductLibrary = useMemo(() => {
-    const q = productKeyword.trim().toLowerCase();
+    const q = deferredProductKeyword.trim().toLowerCase();
     if (!q) return productLibrary;
 
     return productLibrary.filter((product) =>
@@ -260,14 +266,14 @@ export default function PriceListPage() {
         .toLowerCase()
         .includes(q)
     );
-  }, [productLibrary, productKeyword]);
+  }, [productLibrary, deferredProductKeyword]);
 
   const selectedProduct = useMemo(() => {
     return productLibrary.find((product) => product.id === selectedProductId);
   }, [productLibrary, selectedProductId]);
 
   const displayItems = useMemo(() => {
-    return items.map((item) => {
+    return deferredItems.map((item) => {
       const unitPrice =
         priceMode === "wholesale" ? item.wholesalePrice : item.retailPrice;
 
@@ -277,7 +283,7 @@ export default function PriceListPage() {
         amount: unitPrice * item.quantity,
       };
     });
-  }, [items, priceMode]);
+  }, [deferredItems, priceMode]);
 
   const pagedItems = useMemo(() => {
     if (displayItems.length <= ITEMS_PER_FIRST_PAGE) {
@@ -295,17 +301,20 @@ export default function PriceListPage() {
     return [firstPage, ...nextPages];
   }, [displayItems]);
 
-  const focusCell = (rowIndex: number, column: EditableColumn) => {
-    const row = items[rowIndex];
-    if (!row) return;
+  const focusCell = useCallback(
+    (rowIndex: number, column: EditableColumn) => {
+      const row = items[rowIndex];
+      if (!row) return;
 
-    const key = `${row.id}-${column}`;
-    const target = cellRefs.current[key];
-    if (!target) return;
+      const key = `${row.id}-${column}`;
+      const target = cellRefs.current[key];
+      if (!target) return;
 
-    target.focus();
-    target.select?.();
-  };
+      target.focus();
+      target.select?.();
+    },
+    [items]
+  );
 
   const handleCellKeyDown = (
     e: KeyboardEvent<HTMLInputElement>,
@@ -452,27 +461,26 @@ export default function PriceListPage() {
     setSelectedProductId("");
   };
 
-  const updateItem = (
-    id: string,
-    key: keyof PriceItem,
-    value: string | number
-  ) => {
-    setItems((prev) =>
-      prev.map((row) =>
-        row.id === id
-          ? {
-              ...row,
-              [key]:
-                key === "quantity" ||
-                key === "wholesalePrice" ||
-                key === "retailPrice"
-                  ? toNumber(value)
-                  : value,
-            }
-          : row
-      )
-    );
-  };
+  const updateItem = useCallback(
+    (id: string, key: keyof PriceItem, value: string | number) => {
+      setItems((prev) =>
+        prev.map((row) =>
+          row.id === id
+            ? {
+                ...row,
+                [key]:
+                  key === "quantity" ||
+                  key === "wholesalePrice" ||
+                  key === "retailPrice"
+                    ? toNumber(value)
+                    : value,
+              }
+            : row
+        )
+      );
+    },
+    []
+  );
 
   const handleImageUpload = (id: string, e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -495,92 +503,230 @@ export default function PriceListPage() {
         : prev.filter((row) => row.id !== id)
     );
   };
-    const exportCanvas = async () => {
-    if (!previewRef.current) return null;
-    return await html2canvas(previewRef.current, {
-      backgroundColor: "#0b0f14",
+  const getPreviewPages = () => {
+    if (!previewRef.current) return [];
+    return Array.from(
+      previewRef.current.querySelectorAll<HTMLElement>('[data-price-page="true"]')
+    );
+  };
+
+  const exportPageCanvas = async (page: HTMLElement) => {
+    const rawCanvas = await html2canvas(page, {
+      backgroundColor: "#ffffff",
       scale: 2,
       useCORS: true,
+      scrollX: 0,
+      scrollY: -window.scrollY,
+      windowWidth: page.scrollWidth,
+      windowHeight: page.scrollHeight,
     });
+
+    const targetWidth = 794 * 2;
+    const targetHeight = 1123 * 2;
+
+    const normalizedCanvas = document.createElement("canvas");
+    normalizedCanvas.width = targetWidth;
+    normalizedCanvas.height = targetHeight;
+
+    const ctx = normalizedCanvas.getContext("2d");
+    if (!ctx) return rawCanvas;
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, targetWidth, targetHeight);
+
+    const scale = Math.min(
+      targetWidth / rawCanvas.width,
+      targetHeight / rawCanvas.height
+    );
+
+    const drawWidth = rawCanvas.width * scale;
+    const drawHeight = rawCanvas.height * scale;
+    const offsetX = (targetWidth - drawWidth) / 2;
+    const offsetY = (targetHeight - drawHeight) / 2;
+
+    ctx.drawImage(rawCanvas, offsetX, offsetY, drawWidth, drawHeight);
+
+    return normalizedCanvas;
   };
 
   const handleSavePNG = async () => {
-    const canvas = await exportCanvas();
-    if (!canvas) return;
+    const pages = getPreviewPages();
+    if (pages.length === 0) return;
 
-    const link = document.createElement("a");
-    link.href = canvas.toDataURL("image/png");
-    link.download = `${documentNumber || "price-list"}.png`;
-    link.click();
+    for (let index = 0; index < pages.length; index += 1) {
+      const canvas = await exportPageCanvas(pages[index]);
+      const link = document.createElement("a");
+      link.href = canvas.toDataURL("image/png");
+      link.download =
+        pages.length === 1
+          ? `${documentNumber || "price-list"}.png`
+          : `${documentNumber || "price-list"}_${index + 1}.png`;
+      link.click();
+    }
   };
 
   const handleSaveJPG = async () => {
-    const canvas = await exportCanvas();
-    if (!canvas) return;
+    const pages = getPreviewPages();
+    if (pages.length === 0) return;
 
-    const link = document.createElement("a");
-    link.href = canvas.toDataURL("image/jpeg", 0.95);
-    link.download = `${documentNumber || "price-list"}.jpg`;
-    link.click();
+    for (let index = 0; index < pages.length; index += 1) {
+      const canvas = await exportPageCanvas(pages[index]);
+      const link = document.createElement("a");
+      link.href = canvas.toDataURL("image/jpeg", 0.96);
+      link.download =
+        pages.length === 1
+          ? `${documentNumber || "price-list"}.jpg`
+          : `${documentNumber || "price-list"}_${index + 1}.jpg`;
+      link.click();
+    }
   };
 
   const handleSavePDF = async () => {
-    const canvas = await exportCanvas();
-    if (!canvas) return;
+    const pages = getPreviewPages();
+    if (pages.length === 0) return;
 
-    const imgData = canvas.toDataURL("image/jpeg", 0.95);
     const pdf = new jsPDF("p", "mm", "a4");
     const pageWidth = 210;
-    const pageHeight = (canvas.height * pageWidth) / canvas.width;
+    const pageHeight = 297;
 
-    pdf.addImage(imgData, "JPEG", 0, 0, pageWidth, pageHeight);
+    for (let index = 0; index < pages.length; index += 1) {
+      const canvas = await exportPageCanvas(pages[index]);
+      const imgData = canvas.toDataURL("image/jpeg", 0.96);
+
+      if (index > 0) pdf.addPage();
+      pdf.addImage(imgData, "JPEG", 0, 0, pageWidth, pageHeight);
+    }
+
     pdf.save(`${documentNumber || "price-list"}.pdf`);
   };
 
   const handlePrint = async () => {
-    const canvas = await exportCanvas();
-    if (!canvas) return;
+    const pages = getPreviewPages();
+    if (pages.length === 0) return;
 
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
-    const printWindow = window.open("", "_blank", "width=1000,height=800");
-    if (!printWindow) return;
+    const imageUrls: string[] = [];
 
-    printWindow.document.write(`
+    for (const page of pages) {
+      const canvas = await exportPageCanvas(page);
+      imageUrls.push(canvas.toDataURL("image/jpeg", 0.96));
+    }
+
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (!doc) {
+      document.body.removeChild(iframe);
+      alert("인쇄 프레임을 생성할 수 없습니다.");
+      return;
+    }
+
+    doc.open();
+    doc.write(`
       <html>
         <head>
           <title>${documentNumber}</title>
           <style>
+            * {
+              box-sizing: border-box;
+            }
+
+            html,
             body {
               margin: 0;
               padding: 0;
-              background: white;
-              text-align: center;
+              width: 210mm;
+              background: #ffffff;
             }
+
+            .page {
+              width: 210mm;
+              height: 297mm;
+              margin: 0;
+              padding: 0;
+              overflow: hidden;
+              page-break-after: always;
+              break-after: page;
+              background: #ffffff;
+            }
+
+            .page:last-child {
+              page-break-after: auto;
+              break-after: auto;
+            }
+
             img {
-              width: 100%;
-              max-width: 100%;
-              height: auto;
               display: block;
-              margin: 0 auto;
+              width: 210mm;
+              height: 297mm;
+              object-fit: fill;
+              margin: 0;
+              padding: 0;
+              border: 0;
             }
+
+            @page {
+              size: A4 portrait;
+              margin: 0;
+            }
+
             @media print {
+              html,
               body {
                 margin: 0;
+                padding: 0;
+                width: 210mm;
+                background: #ffffff;
               }
-              img {
-                width: 100%;
+
+              .page {
+                width: 210mm;
+                height: 297mm;
+                margin: 0;
+                padding: 0;
               }
             }
           </style>
         </head>
         <body>
-          <img src="${dataUrl}" />
+          ${imageUrls
+            .map((url) => `<div class="page"><img src="${url}" /></div>`)
+            .join("")}
         </body>
       </html>
     `);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
+    doc.close();
+
+    const images = Array.from(doc.images);
+
+    await Promise.all(
+      images.map(
+        (img) =>
+          new Promise<void>((resolve) => {
+            if (img.complete) {
+              resolve();
+              return;
+            }
+            img.onload = () => resolve();
+            img.onerror = () => resolve();
+          })
+      )
+    );
+
+    iframe.contentWindow?.focus();
+    iframe.contentWindow?.print();
+
+    setTimeout(() => {
+      if (document.body.contains(iframe)) {
+        document.body.removeChild(iframe);
+      }
+    }, 1500);
   };
 
   const handleReset = () => {
@@ -1010,7 +1156,7 @@ export default function PriceListPage() {
                   출력 미리보기
                 </h2>
                 <p className="wb-subtitle text-sm">
-                  기존 Price List 구조는 유지하고 컬러 톤만 전체 프로그램과 맞췄습니다.
+                  좌측 입력 반응을 우선하고, 출력 미리보기는 지연 렌더로 부드럽게 반영됩니다.
                 </p>
               </div>
 
@@ -1074,8 +1220,17 @@ export default function PriceListPage() {
                                     </div>
                                   </div>
 
-                                  <div className="max-w-[210px] text-right text-[12px] leading-5 text-gray-500">
-                                    <div className="break-words">{notice}</div>
+                                  <div className="max-w-[260px] text-right text-[13px] leading-5 text-gray-600">
+                                    <div className="font-semibold text-gray-800">
+                                      {clientName || "거래처 미입력"}
+                                    </div>
+                                    <div className="mt-1">
+                                      {clientPhone || "전화번호 미입력"}
+                                      {clientManager ? ` · ${clientManager}` : ""}
+                                    </div>
+                                    <div className="mt-1 break-words text-[12px] text-gray-500">
+                                      {notice}
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -1102,40 +1257,40 @@ export default function PriceListPage() {
                               <div className="overflow-hidden rounded-xl border border-gray-300">
                                 <table className="w-full table-fixed border-collapse">
                                   <colgroup>
-                                    <col style={{ width: "96px" }} />
-                                    <col style={{ width: "155px" }} />
-                                    <col style={{ width: "78px" }} />
+                                    <col style={{ width: "88px" }} />
+                                    <col style={{ width: "170px" }} />
+                                    <col style={{ width: "90px" }} />
                                     <col style={{ width: "46px" }} />
                                     <col style={{ width: "50px" }} />
                                     <col style={{ width: "82px" }} />
                                     <col style={{ width: "92px" }} />
-                                    <col style={{ width: "125px" }} />
+                                    <col style={{ width: "132px" }} />
                                   </colgroup>
 
                                   <thead>
                                     <tr className="bg-white text-gray-900">
-                                      <th className="whitespace-nowrap border-b border-gray-300 px-2 py-3 text-center align-middle text-[13px] font-bold">
+                                      <th className="whitespace-nowrap border-b border-gray-300 px-2 py-2.5 text-center align-middle text-[14px] font-bold">
                                         이미지
                                       </th>
-                                      <th className="whitespace-nowrap border-b border-gray-300 px-2 py-3 text-center align-middle text-[13px] font-bold">
+                                      <th className="whitespace-nowrap border-b border-gray-300 px-2 py-2.5 text-center align-middle text-[14px] font-bold">
                                         제품명
                                       </th>
-                                      <th className="whitespace-nowrap border-b border-gray-300 px-2 py-3 text-center align-middle text-[13px] font-bold">
+                                      <th className="whitespace-nowrap border-b border-gray-300 px-2 py-2.5 text-center align-middle text-[14px] font-bold">
                                         규격
                                       </th>
-                                      <th className="whitespace-nowrap border-b border-gray-300 px-2 py-3 text-center align-middle text-[13px] font-bold">
+                                      <th className="whitespace-nowrap border-b border-gray-300 px-2 py-2.5 text-center align-middle text-[14px] font-bold">
                                         단위
                                       </th>
-                                      <th className="whitespace-nowrap border-b border-gray-300 px-2 py-3 text-center align-middle text-[13px] font-bold">
+                                      <th className="whitespace-nowrap border-b border-gray-300 px-2 py-2.5 text-center align-middle text-[14px] font-bold">
                                         수량
                                       </th>
-                                      <th className="whitespace-nowrap border-b border-gray-300 px-2 py-3 text-center align-middle text-[13px] font-bold">
+                                      <th className="whitespace-nowrap border-b border-gray-300 px-2 py-2.5 text-center align-middle text-[14px] font-bold">
                                         금액
                                       </th>
-                                      <th className="whitespace-nowrap border-b border-gray-300 px-2 py-3 text-center align-middle text-[13px] font-bold">
+                                      <th className="whitespace-nowrap border-b border-gray-300 px-2 py-2.5 text-center align-middle text-[14px] font-bold">
                                         합계
                                       </th>
-                                      <th className="whitespace-nowrap border-b border-gray-300 px-2 py-3 text-center align-middle text-[13px] font-bold">
+                                      <th className="whitespace-nowrap border-b border-gray-300 px-2 py-2.5 text-center align-middle text-[14px] font-bold">
                                         비고
                                       </th>
                                     </tr>
@@ -1149,8 +1304,8 @@ export default function PriceListPage() {
                                           index % 2 === 0 ? "bg-white" : "bg-gray-50"
                                         }
                                       >
-                                        <td className="border-t border-gray-200 px-2 py-0.5 text-center align-middle">
-                                          <div className="mx-auto flex h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-md border border-gray-200 bg-white">
+                                        <td className="border-t border-gray-200 px-2 py-[2px] text-center align-middle">
+                                          <div className="mx-auto flex h-[66px] w-[66px] items-center justify-center overflow-hidden rounded-md border border-gray-200 bg-white">
                                             {item.image ? (
                                               <img
                                                 src={item.image}
@@ -1165,36 +1320,44 @@ export default function PriceListPage() {
                                           </div>
                                         </td>
 
-                                        <td className="border-t border-gray-200 px-2 py-0.5 text-center align-middle text-[13px] font-semibold text-gray-900">
-                                          <div className="truncate">
+                                        <td className="border-t border-gray-200 px-2 py-[2px] text-center align-middle text-[14px] font-semibold leading-tight text-gray-900">
+                                          <div className="break-keep leading-tight">
                                             {item.name || "-"}
                                           </div>
                                         </td>
 
-                                        <td className="border-t border-gray-200 px-2 py-0.5 text-center align-middle text-[13px] text-gray-700">
-                                          <div className="truncate">
+                                        <td className="border-t border-gray-200 px-2 py-[2px] text-center align-middle text-[14px] leading-tight text-gray-700">
+                                          <div className="break-keep leading-tight">
                                             {item.spec || "-"}
                                           </div>
                                         </td>
 
-                                        <td className="border-t border-gray-200 px-2 py-0.5 text-center align-middle text-[13px] text-gray-700">
+                                        <td className="border-t border-gray-200 px-2 py-[2px] text-center align-middle text-[14px] text-gray-700">
                                           {item.unit || "-"}
                                         </td>
 
-                                        <td className="border-t border-gray-200 px-2 py-0.5 text-center align-middle text-[13px] text-gray-700">
+                                        <td className="border-t border-gray-200 px-2 py-[2px] text-center align-middle text-[14px] text-gray-700">
                                           {formatNumber(item.quantity)}
                                         </td>
 
-                                        <td className="border-t border-gray-200 px-2 py-0.5 text-center align-middle text-[13px] font-semibold text-gray-900">
+                                        <td className="border-t border-gray-200 px-2 py-[2px] text-center align-middle text-[14px] font-semibold text-gray-900">
                                           {formatNumber(item.displayPrice)}원
                                         </td>
 
-                                        <td className="border-t border-gray-200 px-2 py-0.5 text-center align-middle text-[13px] font-semibold text-gray-900">
+                                        <td className="border-t border-gray-200 px-2 py-[2px] text-center align-middle text-[14px] font-semibold text-gray-900">
                                           {formatNumber(item.amount)}원
                                         </td>
 
-                                        <td className="border-t border-gray-200 px-2 py-0.5 text-center align-middle text-[12px] text-gray-700">
-                                          <div className="truncate">
+                                        <td className="border-t border-gray-200 px-2 py-[2px] text-center align-middle text-[13px] leading-tight text-gray-700">
+                                          <div
+                                            className="break-keep leading-tight"
+                                            style={{
+                                              display: "-webkit-box",
+                                              WebkitLineClamp: 2,
+                                              WebkitBoxOrient: "vertical",
+                                              overflow: "hidden",
+                                            }}
+                                          >
                                             {item.note || "-"}
                                           </div>
                                         </td>

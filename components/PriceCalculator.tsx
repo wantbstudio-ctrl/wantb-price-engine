@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 type ChannelKey = "online" | "offline" | "distribution";
@@ -160,7 +160,9 @@ function NumericInput({
   min = 0,
 }: NumericInputProps) {
   const [text, setText] = useState(String(value ?? 0));
-
+useEffect(() => {
+  setText(String(value ?? 0));
+}, [value]);
   return (
     <div className="space-y-2">
       <label className="block text-sm font-medium text-[#dbe7f3]">{label}</label>

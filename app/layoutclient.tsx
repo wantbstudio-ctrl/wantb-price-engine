@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ReactNode, useEffect, useMemo, useState } from "react";
+import { ReactNode, useEffect, useMemo, useState, type MouseEvent } from "react";
 
 type AdItem = {
   id?: string;
@@ -21,7 +21,7 @@ interface ElectronWindow extends Window {
   electronAPI?: any;
 }
 
-const menuItems = [
+const baseMenuItems = [
   { href: "/", title: "Selling Price Calculator", subtitle: "판매가 계산기" },
   { href: "/estimate", title: "Estimate", subtitle: "견적서" },
   { href: "/statement", title: "Statement", subtitle: "거래명세서" },
@@ -151,9 +151,9 @@ function SidebarAdCard({ pathname }: { pathname: string }) {
     return (
       <div className="mt-4 overflow-hidden rounded-[22px] border border-[#323c48] bg-[#202833] p-4">
         <div className="mb-2 flex items-center justify-between">
-          <span className="rounded-full border border-[#38BDF8]/40 px-2 py-0.5 text-[10px] font-medium tracking-wide text-[#38BDF8]">
-            AD
-          </span>
+<span className="text-[11px] font-semibold tracking-[0.18em] text-[#38BDF8] opacity-90">
+  LIVE
+</span>
           <span className="text-[10px] text-[#7f8a99]">sidebar-bottom</span>
         </div>
 
@@ -164,49 +164,87 @@ function SidebarAdCard({ pathname }: { pathname: string }) {
     );
   }
 
-  const content = (
+  const openAdLink = () => {
+    const url = String(ad.linkUrl || "");
+    if (!url) return;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const openInquiryLink = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    window.open("http://pf.kakao.com/_SFVUxj/chat", "_blank", "noopener,noreferrer");
+  };
+
+  return (
     <div className="mt-4 overflow-hidden rounded-[22px] border border-[#323c48] bg-[#202833] p-3 transition hover:border-[#38BDF8]/50">
       <div className="mb-2 flex items-center justify-between">
-        <span className="rounded-full border border-[#38BDF8]/40 px-2 py-0.5 text-[10px] font-medium tracking-wide text-[#38BDF8]">
+        <span className="text-[11px] font-semibold tracking-[0.18em] text-[#38BDF8] opacity-90">
           LIVE
         </span>
 
-        <span className="truncate pl-2 text-[10px] text-[#7f8a99]">
-          {ad.name || "광고"}
-        </span>
+        <button
+          type="button"
+          onClick={openInquiryLink}
+          className="shrink-0 rounded-full border border-[#38BDF8]/50 bg-[#0f2430] px-3 py-1 text-[11px] font-semibold text-[#38BDF8] shadow-[0_0_12px_rgba(56,189,248,0.14)] transition hover:bg-[#133445]"
+        >
+          광고문의
+        </button>
       </div>
 
-      <div className="aspect-[9/16] w-full overflow-hidden rounded-[18px] border border-[#323c48] bg-[#111821]">
-        <img
-          src={ad.imageUrl}
-          alt={ad.name || "광고 이미지"}
-          className="h-full w-full object-cover"
-        />
-      </div>
-    </div>
-  );
-
-  if (ad.linkUrl) {
-    return (
       <button
         type="button"
-        onClick={() => {
-          const url = String(ad.linkUrl || "");
-          if (!url) return;
-          window.open(url, "_blank", "noopener,noreferrer");
-        }}
+        onClick={openAdLink}
         className="block w-full text-left"
       >
-        {content}
+        <div className="aspect-[9/16] w-full overflow-hidden rounded-[18px] border border-[#323c48] bg-[#111821]">
+          <img
+            src={ad.imageUrl}
+            alt={ad.name || "광고 이미지"}
+            className="h-full w-full object-cover"
+          />
+        </div>
       </button>
-    );
-  }
-
-  return content;
+    </div>
+  );
 }
 
 export default function LayoutClient({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function checkAdminStatus() {
+      try {
+        const api = (window as ElectronWindow).electronAPI;
+
+        if (!api?.getLicenseStatus) {
+          if (mounted) setIsAdmin(false);
+          return;
+        }
+
+        const status = await api.getLicenseStatus();
+
+        if (!mounted) return;
+
+        setIsAdmin(status?.role === "admin" || status?.isAdmin === true);
+      } catch {
+        if (mounted) setIsAdmin(false);
+      }
+    }
+
+    checkAdminStatus();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const menuItems = useMemo(() => {
+    if (isAdmin) return baseMenuItems;
+    return baseMenuItems.filter((item) => item.href !== "/ad-manager");
+  }, [isAdmin]);
 
   const activeTitle = useMemo(() => {
     const exact = menuItems.find((item) => item.href === pathname);
@@ -217,7 +255,7 @@ export default function LayoutClient({ children }: { children: ReactNode }) {
     );
 
     return matched?.subtitle || "판매가 계산기";
-  }, [pathname]);
+  }, [menuItems, pathname]);
 
   async function openExternalLink(url: string) {
     try {

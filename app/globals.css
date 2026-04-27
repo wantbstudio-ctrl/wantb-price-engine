@@ -24,7 +24,7 @@
   --wb-input-bg-hover: #111821;
   --wb-input-bg-focus: #141b22;
   --wb-input-border: #34404b;
-  --wb-input-border-focus: #22b7ff;
+  --wb-input-border-focus: #38bdf8;
   --wb-input-text: #f4f8fb;
 
   --wb-accent: #38bdf8;
@@ -64,6 +64,8 @@ body {
   padding: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     Roboto, "Noto Sans KR", sans-serif;
+  background: var(--wb-bg);
+  color: var(--wb-text);
 }
 
 .drag-area {
@@ -96,16 +98,25 @@ button {
     border-color 0.18s ease,
     color 0.18s ease,
     box-shadow 0.18s ease,
-    transform 0.12s ease;
+    transform 0.12s ease,
+    filter 0.18s ease;
+  will-change: transform;
+}
+
+button:hover {
+  filter: brightness(1.04);
 }
 
 button:active {
-  transform: translateY(0.5px);
+  transform: translateY(1px) scale(0.995);
 }
 
 button:focus-visible {
   outline: none;
-  box-shadow: var(--wb-ring);
+  box-shadow:
+    0 0 0 1px rgba(56, 189, 248, 0.75),
+    0 0 0 4px rgba(56, 189, 248, 0.12),
+    0 0 18px rgba(56, 189, 248, 0.12);
 }
 
 /* ============================= */
@@ -115,30 +126,39 @@ button:focus-visible {
 input,
 textarea,
 select {
-  background: var(--wb-input-bg);
+  background: linear-gradient(180deg, #0c1117 0%, #0a0f15 100%);
   border: 1px solid var(--wb-input-border);
   color: var(--wb-input-text);
   border-radius: var(--wb-input-radius);
   outline: none;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.12s ease;
 }
 
 input:hover,
 textarea:hover,
 select:hover {
-  background: var(--wb-input-bg-hover);
+  background: #111821;
+  border-color: #41505d;
 }
 
 input:focus,
 textarea:focus,
 select:focus {
-  background: var(--wb-input-bg-focus);
-  border-color: var(--wb-input-border-focus);
-  box-shadow: var(--wb-ring);
+  background: #141b22;
+  border-color: #38bdf8;
+  box-shadow:
+    0 0 0 1px rgba(56, 189, 248, 0.72),
+    0 0 0 4px rgba(56, 189, 248, 0.1),
+    0 0 16px rgba(56, 189, 248, 0.1);
 }
 
 input::placeholder,
 textarea::placeholder {
-  color: var(--wb-placeholder);
+  color: #6f7f8f;
 }
 
 textarea {
@@ -195,10 +215,6 @@ textarea {
     line-height: 1.7;
   }
 
-  /* ===================== */
-  /* 버튼 시스템 */
-  /* ===================== */
-
   .wb-btn {
     min-height: 42px;
     padding: 10px 16px;
@@ -217,7 +233,6 @@ textarea {
     color: #ffffff;
   }
 
-  /* Primary */
   .wb-btn-primary {
     border-color: var(--wb-accent);
     color: #ffffff;
@@ -235,7 +250,6 @@ textarea {
       0 0 18px rgba(56, 189, 248, 0.22);
   }
 
-  /* Secondary */
   .wb-btn-secondary {
     background: var(--wb-surface);
     border-color: var(--wb-border-strong);
@@ -248,7 +262,6 @@ textarea {
     color: #ffffff;
   }
 
-  /* Danger */
   .wb-btn-danger {
     background: var(--wb-surface);
     border-color: #3f2a2d;
@@ -261,7 +274,6 @@ textarea {
     color: var(--wb-danger-text);
   }
 
-  /* Ghost */
   .wb-btn-ghost {
     background: transparent;
     border-color: transparent;
@@ -297,17 +309,17 @@ textarea {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--wb-scroll-track);
+  background: #0b0f14;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--wb-scroll-thumb);
+  background: linear-gradient(180deg, #3b4753 0%, #556474 100%);
   border-radius: 999px;
-  border: 2px solid var(--wb-scroll-track);
+  border: 2px solid #0b0f14;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--wb-scroll-thumb-hover);
+  background: linear-gradient(180deg, #4d5b69 0%, #66788a 100%);
 }
 
 /* ============================= */

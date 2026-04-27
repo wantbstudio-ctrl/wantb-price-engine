@@ -3,6 +3,7 @@
 import {
   memo,
   useCallback,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -11,7 +12,7 @@ import {
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
-type VatMode = "included" | "separate";
+type VatMode = "included" | "separate" | "none";
 
 type EditableField =
   | "dateYear"
@@ -270,6 +271,17 @@ function calcFromUnitPrice(
     };
   }
 
+  if (vatMode === "separate") {
+    const supplyAmount = total;
+    const taxAmount = Math.round(supplyAmount * 0.1);
+    return {
+      quantity: safeQty,
+      unitPrice: safeUnitPrice,
+      supplyAmount,
+      taxAmount,
+    };
+  }
+
   return {
     quantity: safeQty,
     unitPrice: safeUnitPrice,
@@ -290,6 +302,18 @@ function calcFromSupplyAmount(
     const taxAmount = Math.round(safeSupply * 0.1);
     const total = safeSupply + taxAmount;
     const unitPrice = Math.round(total / safeQty);
+
+    return {
+      quantity: safeQty,
+      unitPrice,
+      supplyAmount: safeSupply,
+      taxAmount,
+    };
+  }
+
+  if (vatMode === "separate") {
+    const taxAmount = Math.round(safeSupply * 0.1);
+    const unitPrice = safeQty > 0 ? Math.round(safeSupply / safeQty) : 0;
 
     return {
       quantity: safeQty,
@@ -545,7 +569,7 @@ const subtleButtonClass =
 const miniChipClass =
   "inline-flex h-8 items-center justify-center rounded-full border border-[#2b82b6] bg-[#0d1319] px-3 text-[10px] font-semibold tracking-[0.12em] text-[#6fd6ff] transition hover:border-[#22b7ff] hover:text-white";
 
-function StatementHalfDocument({
+const StatementHalfDocument = memo(function StatementHalfDocument({
   rows,
   color,
   receiver,
@@ -694,8 +718,8 @@ function StatementHalfDocument({
                 fontWeight: 700,
                 textAlign: "center",
                 fontSize: "15px",
-                height: "32px",
-                lineHeight: 1,
+                height: "36px",
+                lineHeight: 1.25,
               }}
             >
               상호명
@@ -705,11 +729,11 @@ function StatementHalfDocument({
                 borderRight: border,
                 borderBottom: border,
                 color: textColor,
-                fontSize: "17px",
+                fontSize: "16px",
                 fontWeight: 500,
-                padding: "6px 10px",
-                height: "40px",
-                lineHeight: 1.25,
+                padding: "7px 10px 5px 10px",
+                height: "48px",
+                lineHeight: 1.6,
                 verticalAlign: "middle",
               }}
             >
@@ -737,8 +761,8 @@ function StatementHalfDocument({
                 fontWeight: 700,
                 textAlign: "center",
                 fontSize: "15px",
-                height: "32px",
-                lineHeight: 1,
+                height: "36px",
+                lineHeight: 1.25,
               }}
             >
               사업자번호
@@ -748,11 +772,11 @@ function StatementHalfDocument({
                 borderRight: border,
                 borderBottom: border,
                 color: textColor,
-                fontSize: "17px",
+                fontSize: "16px",
                 fontWeight: 500,
-                padding: "6px 10px",
-                height: "40px",
-                lineHeight: 1.25,
+                padding: "7px 10px 5px 10px",
+                height: "48px",
+                lineHeight: 1.6,
                 verticalAlign: "middle",
               }}
             >
@@ -766,8 +790,8 @@ function StatementHalfDocument({
                 fontWeight: 700,
                 textAlign: "center",
                 fontSize: "15px",
-                height: "32px",
-                lineHeight: 1,
+                height: "36px",
+                lineHeight: 1.25,
               }}
             >
               성명
@@ -776,11 +800,11 @@ function StatementHalfDocument({
               style={{
                 borderBottom: border,
                 color: textColor,
-                fontSize: "17px",
+                fontSize: "16px",
                 fontWeight: 500,
-                padding: "6px 10px",
-                height: "40px",
-                lineHeight: 1.25,
+                padding: "7px 10px 5px 10px",
+                height: "48px",
+                lineHeight: 1.6,
                 verticalAlign: "middle",
               }}
             >
@@ -810,9 +834,9 @@ function StatementHalfDocument({
                 color: subTextColor,
                 fontSize: "15px",
                 fontWeight: 500,
-                padding: "6px 10px",
-                height: "52px",
-                lineHeight: 1.2,
+                padding: "7px 10px 5px 10px",
+                height: "56px",
+                lineHeight: 1.55,
                 verticalAlign: "middle",
               }}
             >
@@ -827,8 +851,8 @@ function StatementHalfDocument({
                 fontWeight: 700,
                 textAlign: "center",
                 fontSize: "15px",
-                height: "32px",
-                lineHeight: 1,
+                height: "36px",
+                lineHeight: 1.25,
               }}
             >
               상호명
@@ -841,8 +865,8 @@ function StatementHalfDocument({
                 fontSize: "17px",
                 fontWeight: 500,
                 padding: 0,
-                height: "40px",
-                lineHeight: 1.25,
+                height: "44px",
+                lineHeight: 1.45,
                 verticalAlign: "middle",
                 position: "relative",
               }}
@@ -866,6 +890,9 @@ function StatementHalfDocument({
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
+                    lineHeight: 1.6,
+                    paddingTop: "2px",
+                    paddingBottom: "2px",
                   }}
                 >
                   {supplier.companyName || ""}
@@ -897,8 +924,8 @@ function StatementHalfDocument({
                 fontWeight: 700,
                 textAlign: "center",
                 fontSize: "15px",
-                height: "32px",
-                lineHeight: 1,
+                height: "36px",
+                lineHeight: 1.25,
               }}
             >
               팩스
@@ -907,11 +934,11 @@ function StatementHalfDocument({
               style={{
                 borderBottom: border,
                 color: textColor,
-                fontSize: "17px",
+                fontSize: "16px",
                 fontWeight: 500,
-                padding: "6px 10px",
-                height: "40px",
-                lineHeight: 1.25,
+                padding: "7px 10px 5px 10px",
+                height: "48px",
+                lineHeight: 1.6,
                 verticalAlign: "middle",
               }}
             >
@@ -928,8 +955,8 @@ function StatementHalfDocument({
                 fontWeight: 700,
                 textAlign: "center",
                 fontSize: "15px",
-                height: "32px",
-                lineHeight: 1,
+                height: "36px",
+                lineHeight: 1.25,
               }}
             >
               전화번호
@@ -939,11 +966,11 @@ function StatementHalfDocument({
                 borderRight: border,
                 borderBottom: border,
                 color: textColor,
-                fontSize: "17px",
+                fontSize: "16px",
                 fontWeight: 500,
-                padding: "6px 10px",
-                height: "40px",
-                lineHeight: 1.25,
+                padding: "7px 10px 5px 10px",
+                height: "48px",
+                lineHeight: 1.6,
                 verticalAlign: "middle",
               }}
             >
@@ -971,9 +998,9 @@ function StatementHalfDocument({
                 color: subTextColor,
                 fontSize: "15px",
                 fontWeight: 500,
-                padding: "6px 10px",
-                height: "52px",
-                lineHeight: 1.2,
+                padding: "7px 10px 5px 10px",
+                height: "56px",
+                lineHeight: 1.55,
                 verticalAlign: "middle",
               }}
             >
@@ -987,8 +1014,8 @@ function StatementHalfDocument({
                 fontWeight: 700,
                 textAlign: "center",
                 fontSize: "15px",
-                height: "32px",
-                lineHeight: 1,
+                height: "36px",
+                lineHeight: 1.25,
               }}
             >
               VAT
@@ -997,15 +1024,15 @@ function StatementHalfDocument({
               style={{
                 borderBottom: border,
                 color: textColor,
-                fontSize: "17px",
+                fontSize: "16px",
                 fontWeight: 500,
-                padding: "6px 10px",
-                height: "40px",
-                lineHeight: 1.25,
+                padding: "7px 10px 5px 10px",
+                height: "48px",
+                lineHeight: 1.6,
                 verticalAlign: "middle",
               }}
             >
-              {vatMode === "included" ? "포함" : "별도"}
+              {vatMode === "included" ? "포함" : vatMode === "separate" ? "별도" : "없음"}
             </td>
           </tr>
 
@@ -1018,8 +1045,8 @@ function StatementHalfDocument({
                 fontWeight: 700,
                 textAlign: "center",
                 fontSize: "15px",
-                height: "32px",
-                lineHeight: 1,
+                height: "36px",
+                lineHeight: 1.25,
               }}
             >
               합계금액
@@ -1029,11 +1056,11 @@ function StatementHalfDocument({
                 borderRight: border,
                 borderBottom: border,
                 color: textColor,
-                fontSize: "17px",
+                fontSize: "16px",
                 fontWeight: 700,
-                padding: "6px 10px",
-                height: "40px",
-                lineHeight: 1.25,
+                padding: "7px 10px 5px 10px",
+                height: "48px",
+                lineHeight: 1.6,
                 verticalAlign: "middle",
               }}
             >
@@ -1048,8 +1075,8 @@ function StatementHalfDocument({
                 fontWeight: 700,
                 textAlign: "center",
                 fontSize: "15px",
-                height: "32px",
-                lineHeight: 1,
+                height: "36px",
+                lineHeight: 1.25,
               }}
             >
               전화
@@ -1059,11 +1086,11 @@ function StatementHalfDocument({
                 borderRight: border,
                 borderBottom: border,
                 color: textColor,
-                fontSize: "17px",
+                fontSize: "16px",
                 fontWeight: 500,
-                padding: "6px 10px",
-                height: "40px",
-                lineHeight: 1.25,
+                padding: "7px 10px 5px 10px",
+                height: "48px",
+                lineHeight: 1.6,
                 verticalAlign: "middle",
               }}
             >
@@ -1077,8 +1104,8 @@ function StatementHalfDocument({
                 fontWeight: 700,
                 textAlign: "center",
                 fontSize: "15px",
-                height: "32px",
-                lineHeight: 1,
+                height: "36px",
+                lineHeight: 1.25,
               }}
             >
               비고
@@ -1090,8 +1117,8 @@ function StatementHalfDocument({
                 fontSize: "15px",
                 fontWeight: 500,
                 padding: "6px 10px",
-                height: "40px",
-                lineHeight: 1.2,
+                height: "44px",
+                lineHeight: 1.45,
                 verticalAlign: "middle",
               }}
             >
@@ -1146,7 +1173,7 @@ function StatementHalfDocument({
               <td
                 style={{
                   border: border,
-                  height: "26px",
+                  height: "24px",
                   textAlign: "center",
                   fontSize: "15px",
                   fontWeight: 500,
@@ -1160,7 +1187,7 @@ function StatementHalfDocument({
               <td
                 style={{
                   border: border,
-                  height: "26px",
+                  height: "24px",
                   textAlign: "center",
                   fontSize: "15px",
                   fontWeight: 500,
@@ -1174,7 +1201,7 @@ function StatementHalfDocument({
               <td
                 style={{
                   border: border,
-                  height: "26px",
+                  height: "24px",
                   textAlign: "center",
                   fontSize: "15px",
                   fontWeight: 500,
@@ -1188,7 +1215,7 @@ function StatementHalfDocument({
               <td
                 style={{
                   border: border,
-                  height: "26px",
+                  height: "24px",
                   textAlign: "left",
                   fontSize: "15px",
                   fontWeight: 500,
@@ -1202,7 +1229,7 @@ function StatementHalfDocument({
               <td
                 style={{
                   border: border,
-                  height: "26px",
+                  height: "24px",
                   textAlign: "center",
                   fontSize: "15px",
                   fontWeight: 500,
@@ -1216,7 +1243,7 @@ function StatementHalfDocument({
               <td
                 style={{
                   border: border,
-                  height: "26px",
+                  height: "24px",
                   textAlign: "center",
                   fontSize: "15px",
                   fontWeight: 500,
@@ -1230,7 +1257,7 @@ function StatementHalfDocument({
               <td
                 style={{
                   border: border,
-                  height: "26px",
+                  height: "24px",
                   textAlign: "center",
                   fontSize: "15px",
                   fontWeight: 500,
@@ -1244,7 +1271,7 @@ function StatementHalfDocument({
               <td
                 style={{
                   border: border,
-                  height: "26px",
+                  height: "24px",
                   textAlign: "center",
                   fontSize: "15px",
                   fontWeight: 500,
@@ -1258,7 +1285,7 @@ function StatementHalfDocument({
               <td
                 style={{
                   border: border,
-                  height: "26px",
+                  height: "24px",
                   textAlign: "center",
                   fontSize: "15px",
                   fontWeight: 500,
@@ -1272,7 +1299,7 @@ function StatementHalfDocument({
               <td
                 style={{
                   border: border,
-                  height: "26px",
+                  height: "24px",
                   textAlign: "center",
                   fontSize: "15px",
                   fontWeight: 500,
@@ -1291,7 +1318,7 @@ function StatementHalfDocument({
               colSpan={3}
               style={{
                 border: border,
-                height: "26px",
+                height: "24px",
                 textAlign: "center",
                 fontSize: "15px",
                 fontWeight: 700,
@@ -1305,7 +1332,7 @@ function StatementHalfDocument({
             <td
               style={{
                 border: border,
-                height: "26px",
+                height: "24px",
                 textAlign: "center",
                 fontSize: "15px",
                 fontWeight: 500,
@@ -1344,7 +1371,7 @@ function StatementHalfDocument({
               colSpan={2}
               style={{
                 border: border,
-                height: "26px",
+                height: "24px",
                 textAlign: "center",
                 fontSize: "15px",
                 fontWeight: 700,
@@ -1359,7 +1386,7 @@ function StatementHalfDocument({
               colSpan={2}
               style={{
                 border: border,
-                height: "26px",
+                height: "24px",
                 textAlign: "center",
                 fontSize: "15px",
                 fontWeight: 500,
@@ -1397,7 +1424,7 @@ function StatementHalfDocument({
             <td
               style={{
                 border: border,
-                height: "26px",
+                height: "24px",
                 textAlign: "center",
                 fontSize: "15px",
                 fontWeight: 700,
@@ -1411,7 +1438,7 @@ function StatementHalfDocument({
             <td
               style={{
                 border: border,
-                height: "26px",
+                height: "24px",
                 textAlign: "center",
                 fontSize: "15px",
                 fontWeight: 500,
@@ -1426,8 +1453,8 @@ function StatementHalfDocument({
       </table>
     </div>
   );
-}
-function StatementPagePreview({
+});
+const StatementPagePreview = memo(function StatementPagePreview({
   pageIndex,
   pageRows,
   receiver,
@@ -1494,7 +1521,7 @@ function StatementPagePreview({
       </div>
     </div>
   );
-}
+});
 const ItemRow = memo(function ItemRow({
   item,
   index,
@@ -1640,7 +1667,7 @@ const ItemRow = memo(function ItemRow({
         value={unitPriceValue}
         onChange={(e) => onChange(item.id, "unitPrice", e.target.value)}
         onKeyDown={handleKeyDown("unitPrice")}
-        placeholder={vatMode === "included" ? "단가(VAT포함)" : "단가(VAT별도)"}
+        placeholder={vatMode === "included" ? "단가(VAT포함)" : vatMode === "separate" ? "단가(VAT별도)" : "단가"}
         inputMode="numeric"
         className={rightClass}
       />
@@ -1799,7 +1826,7 @@ const ItemTable = memo(function ItemTable({
               수량
             </div>
             <div className="flex h-11 items-center justify-center border-r border-[#27313b]">
-              {vatMode === "included" ? "단가(VAT포함)" : "단가(VAT별도)"}
+              {vatMode === "included" ? "단가(VAT포함)" : vatMode === "separate" ? "단가(VAT별도)" : "단가"}
             </div>
             <div className="flex h-11 items-center justify-center border-r border-[#27313b]">
               공급가액
@@ -2037,30 +2064,50 @@ export default function StatementPage() {
     [totalSupplyAmount, totalTaxAmount]
   );
 
+  const deferredPreviewItems = useDeferredValue(normalizedItems);
+  const deferredReceiver = useDeferredValue(receiver);
+  const deferredSupplier = useDeferredValue(supplier);
+  const deferredVatMode = useDeferredValue(vatMode);
+  const deferredTotalAmount = useDeferredValue(totalAmount);
+  const deferredUnpaidAmount = useDeferredValue(unpaidAmount);
+  const deferredReceiverSigner = useDeferredValue(receiverSigner);
+  const deferredSupplierSigner = useDeferredValue(supplierSigner);
+  const deferredNotes = useDeferredValue(notes);
+  const deferredCompanySettings = useDeferredValue(companySettings);
+
   const previewPages = useMemo(
-    () => chunkPreviewRows(normalizedItems),
-    [normalizedItems]
+    () => chunkPreviewRows(deferredPreviewItems),
+    [deferredPreviewItems]
   );
 
   const filteredClients = useMemo(() => {
     const keyword = clientSearch.trim().toLowerCase();
-    if (!keyword) return clients;
+    const sourceClients = clients;
 
-    return clients.filter((client) =>
+    if (!keyword) return sourceClients;
+
+    return sourceClients.filter((client: any) =>
       [
         client.name,
+        client.clientName,
         client.owner,
+        client.contactName,
+        client.managerName,
         client.businessNumber,
         client.phone,
+        client.tel,
+        client.mobile,
         client.email,
         client.address,
         client.memo,
+        client.note,
       ]
+        .filter(Boolean)
         .join(" ")
         .toLowerCase()
         .includes(keyword)
     );
-  }, [clients, clientSearch]);
+  }, [clientSearch, clients]);
 
   const syncSavedStatements = useCallback((next: SavedStatement[]) => {
     setSavedStatements(next);
@@ -2784,47 +2831,56 @@ export default function StatementPage() {
                   />
                 </div>
 
-                <div className="max-h-[320px] overflow-y-auto p-4">
+                <div className="max-h-[260px] overflow-y-auto">
                   {filteredClients.length === 0 ? (
-                    <div className="rounded-[22px] border border-dashed border-[#34404b] p-6 text-center text-[13px] text-[#8391a0]">
+                    <div className="p-6 text-center text-[13px] text-[#8391a0]">
                       {clients.length === 0
                         ? "등록된 거래처가 없습니다."
                         : "검색 결과가 없습니다."}
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="overflow-hidden">
+                      <div className="grid grid-cols-[1fr_1.25fr_0.8fr_0.65fr_120px] items-center gap-3 border-b border-[#27313b] bg-[#17202a] px-4 py-2 text-[12px] font-semibold text-[#9fdcff]">
+                        <div>거래처명</div>
+                        <div>주소</div>
+                        <div>전화번호</div>
+                        <div>담당자</div>
+                        <div className="text-center">관리</div>
+                      </div>
+
                       {filteredClients.map((client) => (
                         <div
                           key={client.id}
-                          className="rounded-[22px] border border-[#27313b] bg-[#131921] p-4"
+                          className="grid grid-cols-[1fr_1.25fr_0.8fr_0.65fr_120px] items-center gap-3 border-b border-[#27313b] bg-[#10151b] px-4 py-2.5 text-[13px] last:border-b-0 hover:bg-[#151d26]"
                         >
-                          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                            <div className="space-y-1">
-                              <div className="text-[17px] font-semibold text-[#f7f8fb]">
-                                {client.name}
-                              </div>
-                              <div className="text-[13px] text-[#c0cdd8]">
-                                {client.owner || "-"} / {client.businessNumber || "-"}
-                              </div>
-                              <div className="text-[13px] text-[#c0cdd8]">
-                                전화번호: {client.phone || "-"}
-                              </div>
-                              <div className="text-[13px] text-[#c0cdd8]">
-                                이메일: {client.email || "-"}
-                              </div>
-                              <div className="text-[13px] text-[#c0cdd8]">
-                                주소: {client.address || "-"}
-                              </div>
+                          <div className="min-w-0">
+                            <div className="truncate font-semibold text-white">
+                              {client.name || "-"}
                             </div>
-
-                            <button
-                              type="button"
-                              onClick={() => handleSelectClient(client)}
-                              className={blueOutlineButtonClass}
-                            >
-                              이 거래처 선택
-                            </button>
+                            <div className="mt-0.5 truncate text-[11px] text-[#8fa1b2]">
+                              {client.businessNumber || "사업자번호 없음"}
+                            </div>
                           </div>
+
+                          <div className="truncate text-[#c0cdd8]">
+                            {client.address || "-"}
+                          </div>
+
+                          <div className="truncate text-[#c0cdd8]">
+                            {client.phone || "-"}
+                          </div>
+
+                          <div className="truncate text-[#c0cdd8]">
+                            {client.owner || "-"}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleSelectClient(client)}
+                            className={blueOutlineButtonClass}
+                          >
+                            선택
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -2837,7 +2893,7 @@ export default function StatementPage() {
           <div className={pageCardClass}>
             <h2 className={titleClass}>기본 정보</h2>
 
-            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
               <label className="block">
                 <span className="mb-2 block text-[12px] font-semibold text-[#d8e2eb]">
                   문서번호
@@ -2860,20 +2916,6 @@ export default function StatementPage() {
                   onChange={(e) => handleStatementDateChange(e.target.value)}
                   className={inputClass}
                 />
-              </label>
-
-              <label className="block">
-                <span className="mb-2 block text-[12px] font-semibold text-[#d8e2eb]">
-                  VAT 방식
-                </span>
-                <select
-                  value={vatMode}
-                  onChange={(e) => handleVatModeChange(e.target.value as VatMode)}
-                  className={inputClass}
-                >
-                  <option value="included">부가세 포함</option>
-                  <option value="separate">부가세 별도</option>
-                </select>
               </label>
             </div>
           </div>
@@ -2916,6 +2958,23 @@ export default function StatementPage() {
               onCellNavigate={onCellNavigate}
               onPasteRows={handlePasteRows}
             />
+
+            <div className="mt-4 rounded-[24px] border border-[#27313b] bg-[#0f141a] px-4 py-4">
+              <label className="block">
+                <span className="mb-2 block text-[12px] font-semibold text-[#d8e2eb]">
+                  부가세 방식
+                </span>
+                <select
+                  value={vatMode}
+                  onChange={(e) => handleVatModeChange(e.target.value as VatMode)}
+                  className={inputClass}
+                >
+                  <option value="included">부가세 포함</option>
+                  <option value="separate">부가세 별도</option>
+                  <option value="none">부가세 없음</option>
+                </select>
+              </label>
+            </div>
           </div>
 
           <div className={pageCardClass}>
@@ -3270,15 +3329,15 @@ export default function StatementPage() {
                     <StatementPagePreview
                       pageIndex={index}
                       pageRows={pageRows}
-                      receiver={receiver}
-                      supplier={supplier}
-                      vatMode={vatMode}
-                      totalAmount={totalAmount}
-                      unpaidAmount={unpaidAmount}
-                      receiverSigner={receiverSigner}
-                      supplierSigner={supplierSigner}
-                      notes={notes}
-                      companySettings={companySettings}
+                      receiver={deferredReceiver}
+                      supplier={deferredSupplier}
+                      vatMode={deferredVatMode}
+                      totalAmount={deferredTotalAmount}
+                      unpaidAmount={deferredUnpaidAmount}
+                      receiverSigner={deferredReceiverSigner}
+                      supplierSigner={deferredSupplierSigner}
+                      notes={deferredNotes}
+                      companySettings={deferredCompanySettings}
                       setPageRef={setPageRef}
                     />
                   </div>

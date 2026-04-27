@@ -1,6 +1,14 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 type VatMode = "included" | "separate" | "none";
 
@@ -27,6 +35,7 @@ type EstimateLineItem = {
 type SavedEstimateItem = {
   id: number;
   estimateNumber: string;
+  estimateTitle?: string;
 
   productName: string;
   quantity: number;
@@ -642,6 +651,7 @@ export default function EstimatePage() {
   const [savedClients, setSavedClients] = useState<ClientRecord[]>([]);
 
   const [estimateNumber, setEstimateNumber] = useState("");
+  const [customEstimateTitle, setCustomEstimateTitle] = useState("");
   const [vatMode, setVatMode] = useState<VatMode>("included");
   const [items, setItems] = useState<EstimateLineItem[]>([createEmptyLineItem()]);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
@@ -669,6 +679,13 @@ export default function EstimatePage() {
     itemRefs.current = items;
   }, [items]);
 
+  const deferredItems = useDeferredValue(items);
+  const deferredCustomEstimateTitle = useDeferredValue(customEstimateTitle);
+  const deferredClientName = useDeferredValue(clientName);
+  const deferredDeliveryCondition = useDeferredValue(deliveryCondition);
+  const deferredValidUntil = useDeferredValue(validUntil);
+  const deferredVatMode = useDeferredValue(vatMode);
+
   const activeItems = useMemo(() => {
     return items.filter(
       (item) =>
@@ -679,11 +696,21 @@ export default function EstimatePage() {
     );
   }, [items]);
 
-  const estimateTitle = useMemo(() => {
+  const autoEstimateTitle = useMemo(() => {
     if (activeItems.length === 0) return "";
     if (activeItems.length === 1) return activeItems[0].productName || "";
     return `${activeItems[0].productName || "품목"} 외 ${activeItems.length - 1}건`;
   }, [activeItems]);
+
+  const estimateTitle = useMemo(() => {
+    const manualTitle = customEstimateTitle.trim();
+    return manualTitle || autoEstimateTitle;
+  }, [autoEstimateTitle, customEstimateTitle]);
+
+  const previewEstimateTitle = useMemo(() => {
+    const manualTitle = deferredCustomEstimateTitle.trim();
+    return manualTitle || autoEstimateTitle;
+  }, [autoEstimateTitle, deferredCustomEstimateTitle]);
 
   const supplyPrice = useMemo(() => {
     return items.reduce((sum, item) => sum + Number(item.supplyAmount || 0), 0);
@@ -745,7 +772,7 @@ export default function EstimatePage() {
 
     const rows = Array.from({ length: 10 }, () => ({ ...baseRow }));
 
-    items.slice(0, 10).forEach((item, index) => {
+    deferredItems.slice(0, 10).forEach((item, index) => {
       const hasContent =
         item.productName.trim() !== "" ||
         Number(item.quantity || 0) > 0 ||
@@ -762,27 +789,36 @@ export default function EstimatePage() {
         quantity: item.quantity ? String(item.quantity) : "",
         price: item.unitPrice ? formatNumber(item.unitPrice) : "",
         supplyAmount: item.supplyAmount ? formatNumber(item.supplyAmount) : "",
-        note: index === 0 ? getVatModeLabel(vatMode) : "",
+        note: index === 0 ? getVatModeLabel(deferredVatMode) : "",
       };
     });
 
     return rows;
-  }, [items, vatMode]);
+  }, [deferredItems, deferredVatMode]);
 
   const filteredClients = useMemo(() => {
     const keyword = clientSearch.trim().toLowerCase();
-    if (!keyword) return savedClients;
+    const sourceClients = savedClients;
 
-    return savedClients.filter((client) =>
+    if (!keyword) return sourceClients;
+
+    return sourceClients.filter((client: any) =>
       [
         client.name,
+        client.clientName,
         client.owner,
+        client.contactName,
+        client.managerName,
         client.businessNumber,
         client.phone,
+        client.tel,
+        client.mobile,
         client.email,
         client.address,
         client.memo,
+        client.note,
       ]
+        .filter(Boolean)
         .join(" ")
         .toLowerCase()
         .includes(keyword)
@@ -1053,6 +1089,7 @@ export default function EstimatePage() {
       setEmail(draft?.email || "");
       setDeliveryCondition(draft?.deliveryCondition || "");
       setValidUntil(draft?.validUntil || "");
+      setCustomEstimateTitle(draft?.estimateTitle || draft?.title || "");
 
       if (Array.isArray(draft?.items) && draft.items.length > 0) {
         setItems(
@@ -1217,6 +1254,7 @@ export default function EstimatePage() {
 
   const clearFormForNextEstimate = () => {
     setItems([createEmptyLineItem()]);
+    setCustomEstimateTitle("");
     setVatMode("included");
     clearSelectedClient();
     setDeliveryCondition("");
@@ -1247,6 +1285,7 @@ export default function EstimatePage() {
     const newEstimate: SavedEstimateItem = {
       id: Date.now(),
       estimateNumber: finalEstimateNumber,
+      estimateTitle,
 
       productName: estimateTitle || firstItem.productName || "",
       quantity: firstItem.quantity,
@@ -1298,6 +1337,7 @@ export default function EstimatePage() {
 
   const handleLoadEstimate = (item: SavedEstimateItem) => {
     syncCurrentEstimateNumber(item.estimateNumber || "");
+    setCustomEstimateTitle(item.estimateTitle || item.productName || "");
 
     setVatMode(item.vatMode || "included");
     setClientName(item.clientName || "");
@@ -1600,11 +1640,11 @@ export default function EstimatePage() {
               </tr>
               <tr>
                 <td class="label">상호</td>
-                <td>${clientName || "-"}</td>
+                <td>${deferredClientName || "-"}</td>
               </tr>
               <tr>
                 <td class="label">제목</td>
-                <td>${estimateTitle || "-"}</td>
+                <td>${previewEstimateTitle || "-"}</td>
               </tr>
               <tr>
                 <td class="label">합계</td>
@@ -1670,9 +1710,9 @@ export default function EstimatePage() {
 
           <div class="notes">
             <div class="note-title">고객 준수사항</div>
-            <div>1. ${getVatModeLabel(vatMode)}</div>
-            <div>2. 납품조건 : ${deliveryCondition || "-"}</div>
-            <div>3. 유효기간 : ${getDisplayDate(validUntil)}</div>
+            <div>1. ${getVatModeLabel(deferredVatMode)}</div>
+            <div>2. 납품조건 : ${deferredDeliveryCondition || "-"}</div>
+            <div>3. 유효기간 : ${getDisplayDate(deferredValidUntil)}</div>
             <div>문의사항 : ${displayCompanyPhone} / ${displayCompanyEmail}</div>
             <div>계좌정보 : ${displayAccountInfo}</div>
           </div>
@@ -1899,47 +1939,56 @@ export default function EstimatePage() {
                   />
                 </div>
 
-                <div className="max-h-[320px] overflow-y-auto p-4">
+                <div className="max-h-[260px] overflow-y-auto">
                   {filteredClients.length === 0 ? (
-                    <div className="rounded-[22px] border border-dashed border-[#34404b] p-6 text-center text-[13px] text-[#8391a0]">
+                    <div className="p-6 text-center text-[13px] text-[#8391a0]">
                       {savedClients.length === 0
                         ? "등록된 거래처가 없습니다."
                         : "검색 결과가 없습니다."}
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="overflow-hidden">
+                      <div className="grid grid-cols-[1fr_1.25fr_0.8fr_0.65fr_120px] items-center gap-3 border-b border-[#27313b] bg-[#17202a] px-4 py-2 text-[12px] font-semibold text-[#9fdcff]">
+                        <div>거래처명</div>
+                        <div>주소</div>
+                        <div>전화번호</div>
+                        <div>담당자</div>
+                        <div className="text-center">관리</div>
+                      </div>
+
                       {filteredClients.map((client) => (
                         <div
                           key={client.id}
-                          className="rounded-[22px] border border-[#27313b] bg-[#131921] p-4"
+                          className="grid grid-cols-[1fr_1.25fr_0.8fr_0.65fr_120px] items-center gap-3 border-b border-[#27313b] bg-[#10151b] px-4 py-2.5 text-[13px] last:border-b-0 hover:bg-[#151d26]"
                         >
-                          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                            <div className="space-y-1">
-                              <div className="text-[17px] font-semibold text-[#f7f8fb]">
-                                {client.name}
-                              </div>
-                              <div className="text-[13px] text-[#c0cdd8]">
-                                {client.owner || "-"} / {client.businessNumber || "-"}
-                              </div>
-                              <div className="text-[13px] text-[#c0cdd8]">
-                                전화번호: {client.phone || "-"}
-                              </div>
-                              <div className="text-[13px] text-[#c0cdd8]">
-                                이메일: {client.email || "-"}
-                              </div>
-                              <div className="text-[13px] text-[#c0cdd8]">
-                                주소: {client.address || "-"}
-                              </div>
+                          <div className="min-w-0">
+                            <div className="truncate font-semibold text-white">
+                              {client.name || "-"}
                             </div>
-
-                            <button
-                              type="button"
-                              onClick={() => handleSelectClient(client)}
-                              className={outlineBlueButtonClass}
-                            >
-                              이 거래처 선택
-                            </button>
+                            <div className="mt-0.5 truncate text-[11px] text-[#8fa1b2]">
+                              {client.businessNumber || "사업자번호 없음"}
+                            </div>
                           </div>
+
+                          <div className="truncate text-[#c0cdd8]">
+                            {client.address || "-"}
+                          </div>
+
+                          <div className="truncate text-[#c0cdd8]">
+                            {client.phone || "-"}
+                          </div>
+
+                          <div className="truncate text-[#c0cdd8]">
+                            {client.owner || "-"}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleSelectClient(client)}
+                            className={outlineBlueButtonClass}
+                          >
+                            선택
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -1963,6 +2012,21 @@ export default function EstimatePage() {
                   className={fieldInputClass}
                   placeholder="WB-2026-0001"
                 />
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-[12px] font-semibold tracking-[0.01em] text-[#d8e2eb]">
+                  제목
+                </span>
+                <input
+                  value={customEstimateTitle}
+                  onChange={(e) => setCustomEstimateTitle(e.target.value)}
+                  className={fieldInputClass}
+                  placeholder="예: 신비향 5월 납품 견적서"
+                />
+                <p className="mt-2 text-[12px] leading-5 text-[#8d9aaa]">
+                  비워두면 첫 품목명을 기준으로 자동 제목이 적용됩니다. 현재 적용 제목: {previewEstimateTitle || "-"}
+                </p>
               </label>
             </div>
           </div>
@@ -2280,7 +2344,7 @@ export default function EstimatePage() {
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <div>
                         <div className="text-[14px] font-semibold text-[#f7f8fb]">
-                          {item.estimateNumber} / {item.productName}
+                          {item.estimateNumber} / {item.estimateTitle || item.productName}
                         </div>
                         <div className="mt-1 text-[13px] text-[#a9b4bf]">
                           거래처: {item.clientName || "-"} / 총금액: {formatNumber(item.totalAmount)}
@@ -2361,11 +2425,11 @@ export default function EstimatePage() {
                         </tr>
                         <tr>
                           <td className="w-[70px] py-[3px] pr-2 font-bold">상호</td>
-                          <td className="py-[3px]">{clientName || "-"}</td>
+                          <td className="py-[3px]">{deferredClientName || "-"}</td>
                         </tr>
                         <tr>
                           <td className="w-[70px] py-[3px] pr-2 font-bold">제목</td>
-                          <td className="py-[3px]">{estimateTitle || "-"}</td>
+                          <td className="py-[3px]">{previewEstimateTitle || "-"}</td>
                         </tr>
                         <tr>
                           <td className="w-[70px] py-[3px] pr-2 font-bold">합계</td>
@@ -2498,9 +2562,9 @@ export default function EstimatePage() {
 
                   <div className="mt-4 text-[14px] leading-[1.7]">
                     <div className="mb-1 text-[14px] font-extrabold">고객 준수사항</div>
-                    <div>1. {getVatModeLabel(vatMode)}</div>
-                    <div>2. 납품조건 : {deliveryCondition || "-"}</div>
-                    <div>3. 유효기간 : {getDisplayDate(validUntil)}</div>
+                    <div>1. {getVatModeLabel(deferredVatMode)}</div>
+                    <div>2. 납품조건 : {deferredDeliveryCondition || "-"}</div>
+                    <div>3. 유효기간 : {getDisplayDate(deferredValidUntil)}</div>
                     <div>
                       문의사항 : {displayCompanyPhone} / {displayCompanyEmail}
                     </div>

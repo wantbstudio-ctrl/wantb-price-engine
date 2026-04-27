@@ -644,17 +644,24 @@ app.whenReady().then(async () => {
   ipcMain.handle("getLicenseStatus", async () => {
     try {
       const saved = readLicenseFile();
+      const role = saved?.role === "admin" ? "admin" : "user";
 
       return {
         activated: !!saved?.activated,
+        status: saved?.activated ? "ACTIVE" : "INACTIVE",
         licenseKey: saved?.licenseKey || "",
         hardwareId: saved?.hardwareId || createHardwareId(),
+        role,
+        isAdmin: role === "admin",
       };
     } catch {
       return {
         activated: false,
+        status: "INACTIVE",
         licenseKey: "",
         hardwareId: createHardwareId(),
+        role: "user",
+        isAdmin: false,
       };
     }
   });
@@ -671,10 +678,14 @@ app.whenReady().then(async () => {
         };
       }
 
+      const isAdmin = normalized === MASTER_KEY.toUpperCase();
+
       const saved = writeLicenseFile({
         activated: true,
         licenseKey: normalized,
         hardwareId,
+        role: isAdmin ? "admin" : "user",
+        isAdmin,
         activatedAt: new Date().toISOString(),
       });
 

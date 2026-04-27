@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 type Company = {
   companyName: string;
@@ -50,7 +50,7 @@ const noDragStyle = {
   WebkitAppRegion: "no-drag",
 } as any;
 
-function PreviewPaper({
+const PreviewPaper = memo(function PreviewPaper({
   title,
   image,
   emptyText,
@@ -84,10 +84,11 @@ function PreviewPaper({
       </div>
     </div>
   );
-}
+});
 
 export default function CompanySettingsPage() {
   const [company, setCompany] = useState<Company>(initialCompany);
+  const deferredCompany = useDeferredValue(company);
   const [message, setMessage] = useState("");
 
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -326,7 +327,7 @@ export default function CompanySettingsPage() {
 
             <PreviewPaper
               title="로고 미리보기"
-              image={company.logo}
+              image={deferredCompany.logo}
               emptyText="미리보기 없음"
               imageAlt="로고 미리보기"
             />
@@ -377,7 +378,7 @@ export default function CompanySettingsPage() {
 
             <PreviewPaper
               title="도장 미리보기"
-              image={company.stamp}
+              image={deferredCompany.stamp}
               emptyText="미리보기 없음"
               imageAlt="도장 미리보기"
             />
