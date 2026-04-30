@@ -1,4 +1,4 @@
-import"./globals.css";
+import "./globals.css";
 import LayoutClient from "./layoutclient";
 
 export const metadata = {

@@ -3,203 +3,136 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+type LicenseStatus = {
+  activated?: boolean;
+  status?: string;
+  licenseKey?: string;
+  hardwareId?: string;
+  role?: string;
+  isAdmin?: boolean;
+};
+
+type LicenseResult = {
+  success?: boolean;
+  message?: string;
+};
+
+type ElectronAPI = {
+  getHardwareId?: () => Promise<string>;
+  getLicenseStatus?: () => Promise<LicenseStatus>;
+  validateAndSaveLicense?: (key: string) => Promise<LicenseResult>;
+  clearLicense?: () => Promise<{ success?: boolean }>;
+};
+
 export default function LicensePage() {
   const router = useRouter();
 
+  const [licenseKey, setLicenseKey] = useState("");
   const [hardwareId, setHardwareId] = useState("");
-  const [licenseCode, setLicenseCode] = useState("");
   const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [checking, setChecking] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-
-  const noDragStyle = {
-    WebkitAppRegion: "no-drag",
-  } as any;
 
   useEffect(() => {
     let mounted = true;
 
-    const init = async () => {
+    async function loadHardwareId() {
       try {
-        if (typeof window === "undefined") return;
+        const api = (window as any).electronAPI as ElectronAPI;
 
-        const savedStatus = localStorage.getItem("wantb-license");
-
-        if (savedStatus === "ACTIVE") {
-          router.replace("/");
-          return;
+        if (api?.getHardwareId) {
+          const id = await api.getHardwareId();
+          if (mounted) setHardwareId(id || "");
+        } else if (api?.getLicenseStatus) {
+          const status = await api.getLicenseStatus();
+          if (mounted) setHardwareId(status?.hardwareId || "");
+        } else {
+          if (mounted) setHardwareId("Electron API 없음");
         }
-
-        if (window.electronAPI?.getLicenseStatus) {
-          const licenseStatus = await window.electronAPI.getLicenseStatus();
-
-          if (!mounted) return;
-
-          if (
-            licenseStatus?.status === "ACTIVE" ||
-            licenseStatus?.activated === true
-          ) {
-            localStorage.setItem("wantb-license", "ACTIVE");
-            router.replace("/");
-            return;
-          }
-        }
-
-        if (window.electronAPI?.getHardwareId) {
-          const id = await window.electronAPI.getHardwareId();
-
-          if (!mounted) return;
-          setHardwareId(id || "");
-        }
-      } catch (error) {
-        console.error("License init error:", error);
-        if (mounted) {
-          setMessage("라이센스 정보를 불러오는 중 문제가 발생했습니다.");
-        }
+      } catch {
+        if (mounted) setHardwareId("조회 실패");
       } finally {
-        if (mounted) {
-          setLoading(false);
-        }
+        if (mounted) setChecking(false);
       }
-    };
+    }
 
-    init();
+    loadHardwareId();
 
     return () => {
       mounted = false;
     };
-  }, [router]);
+  }, []);
 
-  const handleActivate = async () => {
-    if (!licenseCode.trim()) {
-      setMessage("라이센스 코드를 입력해주세요.");
+  const handleSubmit = async () => {
+    const key = licenseKey.trim();
+
+    if (!key) {
+      setMessage("라이센스 코드를 입력하세요.");
       return;
     }
 
     try {
       setSubmitting(true);
-      setMessage("");
+      setMessage("인증 중...");
 
-      if (!window.electronAPI?.validateAndSaveLicense) {
-        setMessage("Electron API를 찾을 수 없습니다.");
+      const api = (window as any).electronAPI as ElectronAPI;
+
+      if (!api?.validateAndSaveLicense) {
+        setMessage("API 연결 실패");
         return;
       }
 
-      const result = await window.electronAPI.validateAndSaveLicense(
-        licenseCode.trim()
-      );
+      const result = await api.validateAndSaveLicense(key);
 
-      if (result?.success) {
-        localStorage.setItem("wantb-license", "ACTIVE");
-        setMessage("인증 완료. 잠시 후 이동합니다.");
-        router.replace("/");
-      } else {
-        setMessage(result?.message || "라이센스 인증에 실패했습니다.");
+      if (!result?.success) {
+        setMessage(result?.message || "인증 실패");
+        return;
       }
-    } catch (error) {
-      console.error("License activate error:", error);
-      setMessage("라이센스 인증 중 오류가 발생했습니다.");
+
+      setMessage("인증 완료");
+
+      setTimeout(() => {
+        router.replace("/");
+      }, 300);
+    } catch {
+      setMessage("에러 발생");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      await handleActivate();
-    }
-  };
-
-  if (loading) {
-    return (
-      <div
-        className="flex min-h-screen items-center justify-center bg-[#f3f4f6]"
-        style={noDragStyle}
-      >
-        <div
-          className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg"
-          style={noDragStyle}
-        >
-          <h1 className="mb-3 text-2xl font-bold text-gray-900">
-            WantB Price Engine
-          </h1>
-          <p className="text-sm text-gray-600">라이센스 확인 중입니다...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div
-      className="flex min-h-screen items-center justify-center bg-[#f3f4f6] px-4"
-      style={noDragStyle}
-    >
-      <div
-        className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg"
-        style={noDragStyle}
-      >
-        <h1 className="mb-2 text-2xl font-bold text-gray-900">
-          WantB Price Engine
-        </h1>
-        <p className="mb-6 text-sm text-gray-600">
-          라이센스 키를 입력해 프로그램을 활성화하세요.
-        </p>
+    <div className="flex min-h-screen items-center justify-center bg-[#151b22] text-white">
+      <div className="w-[420px] rounded-xl border border-[#323c48] bg-[#1b222b] p-6">
+        <h2 className="mb-4 text-xl text-[#38BDF8]">라이센스 인증</h2>
 
-        <div className="mb-4">
-          <label className="mb-2 block text-sm font-medium text-gray-700">
-            Hardware ID
-          </label>
-          <input
-            type="text"
-            value={hardwareId}
-            readOnly
-            className="w-full rounded-lg border border-[#1f2937] bg-[#050b12] px-4 py-3 text-sm font-medium text-white placeholder:text-white/50 outline-none"
-            style={{
-              ...noDragStyle,
-              color: "#ffffff",
-              WebkitTextFillColor: "#ffffff",
-              caretColor: "#ffffff",
-            }}
-          />
+        <div className="mb-4 text-sm text-gray-400">
+          Hardware ID
         </div>
 
-        <div className="mb-4">
-          <label className="mb-2 block text-sm font-medium text-gray-700">
-            License Code
-          </label>
-          <input
-            type="text"
-            value={licenseCode}
-            onChange={(e) => setLicenseCode(e.target.value.toUpperCase())}
-            onKeyDown={handleKeyDown}
-            placeholder="예: WW10013A"
-            autoFocus
-            className="w-full rounded-lg border border-[#1f2937] bg-[#050b12] px-4 py-3 text-sm font-semibold tracking-wide text-white placeholder:text-white/45 outline-none transition focus:border-[#38BDF8] focus:ring-2 focus:ring-[#38BDF8]/20"
-            style={{
-              ...noDragStyle,
-              color: "#ffffff",
-              WebkitTextFillColor: "#ffffff",
-              caretColor: "#ffffff",
-            }}
-          />
+        <div className="mb-4 rounded bg-black p-3 text-xs">
+          {checking ? "조회중..." : hardwareId}
         </div>
 
-        {message ? (
-          <div className="mb-4 rounded-lg border border-[#d1d5db] bg-[#f9fafb] px-4 py-3 text-sm font-medium text-gray-800">
-            {message}
-          </div>
-        ) : null}
+        <input
+          value={licenseKey}
+          onChange={(e) => setLicenseKey(e.target.value)}
+          placeholder="WW00000A"
+          className="mb-3 w-full rounded bg-black p-3 outline-none"
+        />
 
         <button
-          type="button"
-          onClick={handleActivate}
-          disabled={submitting}
-          className="w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
-          style={noDragStyle}
+          onClick={handleSubmit}
+          className="w-full rounded bg-[#38BDF8] p-3 font-bold text-black"
         >
-          {submitting ? "인증 중..." : "활성화"}
+          {submitting ? "인증 중..." : "인증"}
         </button>
+
+        {message && (
+          <div className="mt-4 text-sm text-gray-300">
+            {message}
+          </div>
+        )}
       </div>
     </div>
   );

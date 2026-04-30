@@ -1,6 +1,6 @@
 {
   "name": "wantb-price-engine",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "main": "electron/main.cjs",
   "description": "WantB Price Engine",
@@ -29,6 +29,7 @@
     "concurrently": "^9.0.1",
     "electron": "^31.0.2",
     "electron-builder": "^24.13.3",
+    "png-to-ico": "^3.0.1",
     "postcss": "^8.4.39",
     "tailwindcss": "^3.4.7",
     "typescript": "^5.5.3",

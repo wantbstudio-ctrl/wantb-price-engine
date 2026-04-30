@@ -6,7 +6,7 @@ const crypto = require("crypto");
 const http = require("http");
 const next = require("next");
 const { execFile } = require("child_process");
-const { getEmbeddedLicenseCodes } = require("./licenseStore.cjs");
+const { getEmbeddedLicenseCodes, getAdminLicenseCodes } = require("./licenseStore.cjs");
 
 const isDev = !app.isPackaged;
 const PROD_PORT = 3210;
@@ -117,24 +117,43 @@ function isLicenseActivated() {
   return Boolean(saved?.activated && saved?.licenseKey);
 }
 
-function isValidLicenseKey(inputKey) {
+function normalizeLicenseKey(inputKey) {
+  return String(inputKey || "").trim().toUpperCase();
+}
+
+function getLicenseRole(inputKey) {
   try {
-    const normalized = String(inputKey || "").trim().toUpperCase();
-    if (!normalized) return false;
+    const normalized = normalizeLicenseKey(inputKey);
+    if (!normalized) return "";
 
     if (normalized === MASTER_KEY.toUpperCase()) {
       writeDebugLog("MASTER KEY 인증 성공");
-      return true;
+      return "admin";
     }
 
-    const codes = getEmbeddedLicenseCodes();
-    writeDebugLog("embedded license code count", codes.length);
+    const adminCodes = getAdminLicenseCodes();
+    if (adminCodes.includes(normalized)) {
+      writeDebugLog("ADMIN CODE 인증 성공");
+      return "admin";
+    }
 
-    return codes.includes(normalized);
+    const userCodes = getEmbeddedLicenseCodes();
+    writeDebugLog("embedded user license code count", userCodes.length);
+    writeDebugLog("embedded admin license code count", adminCodes.length);
+
+    if (userCodes.includes(normalized)) {
+      return "user";
+    }
+
+    return "";
   } catch (error) {
-    writeDebugLog("라이센스 검증 실패", error?.message || error);
-    return false;
+    writeDebugLog("라이센스 role 검증 실패", error?.message || error);
+    return "";
   }
+}
+
+function isValidLicenseKey(inputKey) {
+  return Boolean(getLicenseRole(inputKey));
 }
 
 function getDevStartUrl() {
@@ -578,20 +597,21 @@ async function openUrlWithChrome(url) {
 }
 
 async function createMainWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1440,
-    height: 980,
-    minWidth: 1200,
-    minHeight: 760,
-    backgroundColor: "#ffffff",
-    autoHideMenuBar: true,
-    webPreferences: {
-      preload: path.join(__dirname, "preload.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false,
-    },
-  });
+mainWindow = new BrowserWindow({
+  width: 1440,
+  height: 980,
+  minWidth: 1200,
+  minHeight: 760,
+  backgroundColor: "#ffffff",
+  icon: path.join(getAppRoot(), "icons", "wantb.ico"),
+  autoHideMenuBar: true,
+  webPreferences: {
+    preload: path.join(__dirname, "preload.cjs"),
+    contextIsolation: true,
+    nodeIntegration: false,
+    sandbox: false,
+  },
+});
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     writeDebugLog("setWindowOpenHandler url", url);
@@ -644,15 +664,17 @@ app.whenReady().then(async () => {
   ipcMain.handle("getLicenseStatus", async () => {
     try {
       const saved = readLicenseFile();
-      const role = saved?.role === "admin" ? "admin" : "user";
+      const normalized = normalizeLicenseKey(saved?.licenseKey || "");
+      const currentRole = getLicenseRole(normalized);
+      const activated = Boolean(saved?.activated && normalized && currentRole);
 
       return {
-        activated: !!saved?.activated,
-        status: saved?.activated ? "ACTIVE" : "INACTIVE",
-        licenseKey: saved?.licenseKey || "",
+        activated,
+        status: activated ? "ACTIVE" : "INACTIVE",
+        licenseKey: activated ? normalized : "",
         hardwareId: saved?.hardwareId || createHardwareId(),
-        role,
-        isAdmin: role === "admin",
+        role: activated ? currentRole : "user",
+        isAdmin: activated && currentRole === "admin",
       };
     } catch {
       return {
@@ -669,22 +691,23 @@ app.whenReady().then(async () => {
   ipcMain.handle("validateAndSaveLicense", async (_, licenseKey) => {
     try {
       const hardwareId = createHardwareId();
-      const normalized = String(licenseKey || "").trim().toUpperCase();
+      const normalized = normalizeLicenseKey(licenseKey);
+      const role = getLicenseRole(normalized);
 
-      if (!isValidLicenseKey(normalized)) {
+      if (!role) {
         return {
           success: false,
           message: "유효하지 않은 라이센스 키입니다.",
         };
       }
 
-      const isAdmin = normalized === MASTER_KEY.toUpperCase();
+      const isAdmin = role === "admin";
 
       const saved = writeLicenseFile({
         activated: true,
         licenseKey: normalized,
         hardwareId,
-        role: isAdmin ? "admin" : "user",
+        role,
         isAdmin,
         activatedAt: new Date().toISOString(),
       });

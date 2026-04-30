@@ -228,7 +228,11 @@ export default function LayoutClient({ children }: { children: ReactNode }) {
 
         if (!mounted) return;
 
-        setIsAdmin(status?.role === "admin" || status?.isAdmin === true);
+        const admin =
+          status?.activated === true &&
+          (status?.role === "admin" || status?.isAdmin === true);
+
+        setIsAdmin(admin);
       } catch {
         if (mounted) setIsAdmin(false);
       }
@@ -236,10 +240,15 @@ export default function LayoutClient({ children }: { children: ReactNode }) {
 
     checkAdminStatus();
 
+    const timer = window.setInterval(checkAdminStatus, 1000);
+    window.addEventListener("focus", checkAdminStatus);
+
     return () => {
       mounted = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", checkAdminStatus);
     };
-  }, []);
+  }, [pathname]);
 
   const menuItems = useMemo(() => {
     if (isAdmin) return baseMenuItems;

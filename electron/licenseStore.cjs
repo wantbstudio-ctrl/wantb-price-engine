@@ -1,4 +1,4 @@
-const EMBEDDED_LICENSE_CODES = [
+const USER_LICENSE_CODES = [
   "WW45555G",
   "WW60375E",
   "WW98226S",
@@ -2998,14 +2998,36 @@ const EMBEDDED_LICENSE_CODES = [
   "WW96308D",
   "WW37340D",
   "WW34514S",
-  "WW97116B"
+  "WW97116B",
 ];
 
+const ADMIN_LICENSE_CODES = [
+  "WANTB-MASTER-001"
+];
+
+function normalizeCode(code) {
+  return String(code || "").trim().toUpperCase();
+}
+
+function uniqueNormalizedCodes(codes) {
+  return Array.from(
+    new Set(
+      (Array.isArray(codes) ? codes : [])
+        .map(normalizeCode)
+        .filter(Boolean)
+    )
+  );
+}
+
 function getEmbeddedLicenseCodes() {
-  return EMBEDDED_LICENSE_CODES;
+  return uniqueNormalizedCodes(USER_LICENSE_CODES);
+}
+
+function getAdminLicenseCodes() {
+  return uniqueNormalizedCodes(ADMIN_LICENSE_CODES);
 }
 
 module.exports = {
-  EMBEDDED_LICENSE_CODES,
   getEmbeddedLicenseCodes,
+  getAdminLicenseCodes,
 };

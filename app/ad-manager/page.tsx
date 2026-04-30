@@ -374,7 +374,7 @@ export default function AdManagerPage() {
       try {
         const api = (window as any).electronAPI;
         const status = await api?.getLicenseStatus?.();
-        const ok = status?.role === "admin" || status?.isAdmin === true;
+        const ok = status?.activated === true && (status?.role === "admin" || status?.isAdmin === true);
         if (!ok) {
           router.replace("/");
           return;
@@ -390,17 +390,16 @@ export default function AdManagerPage() {
     return () => { mounted = false; };
   }, [router]);
 
-  if (authChecking) {
-    return <div className="rounded-3xl border border-white/10 bg-[#121821] p-10 text-sm text-slate-300">권한 확인 중입니다...</div>;
-  }
   const [ads, setAds] = useState<AdItem[]>([]);
-  const deferredAds = useDeferredValue(ads);
   const [form, setForm] = useState<AdForm>(createEmptyForm());
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [selectedId, setSelectedId] = useState<string>("");
   const [keyword, setKeyword] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
+
+  const deferredAds = useDeferredValue(ads);
+  const deferredForm = useDeferredValue(form);
 
   const filteredAds = useMemo(() => {
     const q = keyword.trim().toLowerCase();
@@ -442,8 +441,11 @@ export default function AdManagerPage() {
   };
 
   useEffect(() => {
-    loadAds();
-  }, []);
+    if (!authChecking) {
+      loadAds();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authChecking]);
 
   const handleChange = <K extends keyof AdForm>(key: K, value: AdForm[K]) => {
     setForm((prev) => ({
@@ -593,6 +595,14 @@ export default function AdManagerPage() {
       )
     );
   };
+
+  if (authChecking) {
+    return (
+      <div className="rounded-3xl border border-white/10 bg-[#121821] p-10 text-sm text-slate-300">
+        권한 확인 중입니다...
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -1076,7 +1086,7 @@ export default function AdManagerPage() {
           </div>
         </div>
 
-        <AdPreview form={useDeferredValue(form)} />
+        <AdPreview form={deferredForm} />
       </div>
     </div>
   );
